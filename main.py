@@ -3,6 +3,7 @@ CHIP-8 Interpreter.
 """
 from collections import deque
 
+# 16 x 5
 FONTS = [
     0xF0,
     0x90,
@@ -97,6 +98,10 @@ class CHIP8Interpreter:
         self.working = False
         self.drawing = False
 
+        # load fonts set into memory
+        for i, font in enumerate(FONTS):
+            self.memory[i] = font
+
     def load_rom(self, path_to_rom: str) -> None:
         """
         Load binary from rom file into memory
@@ -108,7 +113,8 @@ class CHIP8Interpreter:
         """
         with open(path_to_rom, "rb") as f:
             i = 0
-            byte = f.read(1)  # read one byte
+            byte = f.read(1)
+            # read byte by byte and place in memory from 0x200 (512)
             while byte:
                 self.memory[i + 0x200] = ord(byte)
                 i += 1
@@ -118,12 +124,23 @@ class CHIP8Interpreter:
         """Start program"""
         self.working = True
         while self.working:
+            self.process()
             self.draw()
 
     def draw(self) -> None:
         """Update display"""
         if self.drawing:
             pass
+
+    def process(self) -> None:
+        """Read op code and process it"""
+        op_code = self.memory[self.program_counter]
+
+        # process op code
+
+        self.program_counter += 2  # each instruction is 2 bytes
+
+        # update timers
 
 
 if __name__ == "__main__":
