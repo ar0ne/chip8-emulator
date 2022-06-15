@@ -90,7 +90,7 @@ class CHIP8Interpreter:
         # lowest (rightmost) 12 bits are usually used)
         self.I = 0
         # The program counter should be 16-bit, and is used to store the currently
-        # executing address. Start from 0x200, since beggining of memory reserved for interpreter
+        # executing address. Start from 0x200, since beginning of memory reserved for interpreter
         self.program_counter = 0x200
         # The stack pointer can be 8-bit, it is used to point to the topmost level of the stack
         self.stack_counter = 0
@@ -134,13 +134,98 @@ class CHIP8Interpreter:
 
     def process(self) -> None:
         """Read op code and process it"""
-        op_code = self.memory[self.program_counter]
+        self.op_code = self.memory[self.program_counter]
 
         # process op code
+        self._process_op_code()
 
         self.program_counter += 2  # each instruction is 2 bytes
 
         # update timers
+
+        if self.program_counter >= 4096:
+            self.working = False
+
+    def _process_op_code(self) -> None:
+        """
+        Process operational code.
+
+        nnn or addr - A 12-bit value, the lowest 12 bits of the instruction
+        n or nibble - A 4-bit value, the lowest 4 bits of the instruction
+        x - A 4-bit value, the lower 4 bits of the high byte of the instruction
+        y - A 4-bit value, the upper 4 bits of the low byte of the instruction
+        kk or byte - An 8-bit value, the lowest 8 bits of the instruction
+
+        00E0 - CLS
+        00EE - RET
+        0nnn - SYS addr
+        1nnn - JP addr
+        2nnn - CALL addr
+        3xkk - SE Vx, byte
+        4xkk - SNE Vx, byte
+        5xy0 - SE Vx, Vy
+        6xkk - LD Vx, byte
+        7xkk - ADD Vx, byte
+        8xy0 - LD Vx, Vy
+        8xy1 - OR Vx, Vy
+        8xy2 - AND Vx, Vy
+        8xy3 - XOR Vx, Vy
+        8xy4 - ADD Vx, Vy
+        8xy5 - SUB Vx, Vy
+        8xy6 - SHR Vx {, Vy}
+        8xy7 - SUBN Vx, Vy
+        8xyE - SHL Vx {, Vy}
+        9xy0 - SNE Vx, Vy
+        Annn - LD I, addr
+        Bnnn - JP V0, addr
+        Cxkk - RND Vx, byte
+        Dxyn - DRW Vx, Vy, nibble
+        Ex9E - SKP Vx
+        ExA1 - SKNP Vx
+        Fx07 - LD Vx, DT
+        Fx0A - LD Vx, K
+        Fx15 - LD DT, Vx
+        Fx18 - LD ST, Vx
+        Fx1E - ADD I, Vx
+        Fx29 - LD F, Vx
+        Fx33 - LD B, Vx
+        Fx55 - LD [I], Vx
+        Fx65 - LD Vx, [I]
+
+        0x0010:
+            0x0010 & 0xf000 = 0x0000
+            0x0010 & 0x0f0f = 0x0000 => 00E0
+        """
+
+        code = self.op_code & 0xF000
+        if code == 0x0000:
+            self._0000()
+
+    def _0000(self) -> None:
+        """
+        Not real opcode.
+        There are 3 instructions that starts from 0x0XXX.
+        """
+        code = self.op_code & 0xF0FF
+        if code == 0x00E0:
+            self._00e0()
+        elif code == 0x00EE:
+            self._00ee()
+        else:
+            self._0nnn()
+
+    def _00e0(self) -> None:
+        """CLS - clear screen"""
+        self.display = [0] * 64 * 32
+        self.drawing = True
+
+    def _00ee(self) -> None:
+        """RET - return from a subroutine"""
+        self.program_counter = self.stack.pop()
+
+    def _0nnn(self) -> None:
+        """Jump to a machine code routine at nnn"""
+        # TODO
 
 
 if __name__ == "__main__":
