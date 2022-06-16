@@ -2,7 +2,7 @@
 CHIP-8 Interpreter.
 """
 import random
-from collections import deque
+from collections import defaultdict, deque
 
 # 16 x 5
 FONTS = [
@@ -56,6 +56,7 @@ class CHIP8Interpreter:
     """
 
     VF = 15
+    MEMORY_START = 0x200  # 512
 
     def __init__(self) -> None:
         """Init VM"""
@@ -78,8 +79,9 @@ class CHIP8Interpreter:
         # lowest (rightmost) 12 bits are usually used)
         self.I = 0
         # The program counter should be 16-bit, and is used to store the currently
-        # executing address. Start from 0x200, since beginning of memory reserved for interpreter
-        self.program_counter = 0x200
+        # executing address. Start from 0x200 (512), since beginning of memory reserved for
+        # interpreter
+        self.program_counter = self.MEMORY_START
         # The stack pointer can be 8-bit, it is used to point to the topmost level of the stack
         self.stack_counter = 0
         #
@@ -89,6 +91,49 @@ class CHIP8Interpreter:
         # load fonts set into memory
         for i, font in enumerate(FONTS):
             self.memory[i] = font
+
+        # define mapping op codes to handlers
+        self.OPS_MAPPING = defaultdict(
+            lambda: self._unknown_op_code,
+            {
+                0x0000: self._0000,
+                0x00E0: self._00E0,
+                0x00EE: self._00EE,
+                0x1000: self._1nnn,
+                0x2000: self._2nnn,
+                0x3000: self._3xkk,
+                0x4000: self._4xkk,
+                0x5000: self._5xy0,
+                0x6000: self._6xkk,
+                0x7000: self._7xkk,
+                0x8000: self._8xy0,
+                0x8001: self._8xy1,
+                0x8002: self._8xy2,
+                0x8003: self._8xy3,
+                0x8004: self._8xy4,
+                0x8005: self._8xy5,
+                0x8006: self._8xy6,
+                0x8007: self._8xy7,
+                0x800E: self._8xyE,
+                0x9000: self._9xy0,
+                0xA000: self._Annn,
+                0xB000: self._Bnnn,
+                0xC000: self._Cxkk,
+                0xD000: self._Dxyn,
+                0xE000: self._E000,
+                0xE09E: self._Ex9E,
+                0xE0A1: self._ExA1,
+                0xF007: self._Fx07,
+                0xF00A: self._Fx0A,
+                0xF015: self._Fx15,
+                0xF018: self._Fx18,
+                0xF01E: self._Fx1E,
+                0xF029: self._Fx29,
+                0xF033: self._Fx33,
+                0xF055: self._Fx55,
+                0xF065: self._Fx65,
+            },
+        )
 
     def load_rom(self, path_to_rom: str) -> None:
         """
@@ -104,7 +149,7 @@ class CHIP8Interpreter:
             byte = f.read(1)
             # read byte by byte and place in memory from 0x200 (512)
             while byte:
-                self.memory[i + 0x200] = ord(byte)
+                self.memory[self.MEMORY_START + i] = ord(byte)
                 i += 1
                 byte = f.read(1)
 
@@ -122,7 +167,10 @@ class CHIP8Interpreter:
 
     def process(self) -> None:
         """Read op code and process it"""
-        self.op_code = self.memory[self.program_counter]
+        # op code consist 2 bytes (16 bits)
+        self.op_code = (self.memory[self.program_counter] << 8) | self.memory[
+            self.program_counter + 1
+        ]
 
         # process op code
         self._process_op_code()
@@ -190,8 +238,13 @@ class CHIP8Interpreter:
         """
 
         code = self.op_code & 0xF000
-        if code == 0x0000:
-            self._0000()
+        self._run_instruction(code)
+
+    def _run_instruction(self, code: int) -> None:
+        """Maps code to known op codes"""
+        func = self.OPS_MAPPING[code]
+        print(func.__name__)
+        func()
 
     def _0000(self) -> None:
         """
@@ -199,10 +252,8 @@ class CHIP8Interpreter:
         There are 3 instructions that starts from 0x0XXX.
         """
         code = self.op_code & 0xF0FF
-        if code == 0x00E0:
-            self._00E0()
-        elif code == 0x00EE:
-            self._00EE()
+        if code in (0x00E0, 0x00EE):
+            self._run_instruction(code)
         else:
             self._0nnn()
 
@@ -427,9 +478,9 @@ class CHIP8Interpreter:
         If the most-significant bit of Vx is 1, then VF is set to 1, otherwise to 0. Then Vx is
         multiplied by 2.
         """
-        vx = self.extract_Vx()
-        # most_significant_bit_of_vx =
-        # TODO
+        vx = self.extract_Vx()  # 4 bit (15)
+        self.gpio[self.VF] = 1 if vx & 0b1000 else 0
+        self.gpio[vx] <<= 1
 
     def _9xy0(self) -> None:
         """
@@ -492,6 +543,11 @@ class CHIP8Interpreter:
         """
         # TODO
 
+    def _E000(self) -> None:
+        """Not real op code"""
+        code = self.op_code & 0xF0FF
+        self._run_instruction(code)
+
     def _Ex9E(self) -> None:
         """
         Ex9E - SKP Vx
@@ -511,6 +567,11 @@ class CHIP8Interpreter:
         position, PC is increased by 2.
         """
         # TODO
+
+    def _F000(self) -> None:
+        """Not real op code"""
+        code = self.op_code & 0xF0FF
+        self._run_instruction(code)
 
     def _Fx07(self) -> None:
         """
@@ -551,7 +612,7 @@ class CHIP8Interpreter:
         vx = self.extract_Vx()
         self.sound_timer = self.gpio[vx]
 
-    def Fx1E(self) -> None:
+    def _Fx1E(self) -> None:
         """
         Fx1E - ADD I, Vx
         Set I = I + Vx.
@@ -561,7 +622,7 @@ class CHIP8Interpreter:
         vx = self.extract_Vx()
         self.I += vx
 
-    def Fx29(self) -> None:
+    def _Fx29(self) -> None:
         """
         Fx29 - LD F, Vx
         Set I = location of sprite for digit Vx.
@@ -571,7 +632,7 @@ class CHIP8Interpreter:
         """
         # TODO
 
-    def Fx33(self) -> None:
+    def _Fx33(self) -> None:
         """
         Fx33 - LD B, Vx
         Store BCD representation of Vx in memory locations I, I+1, and I+2.
@@ -585,7 +646,7 @@ class CHIP8Interpreter:
         # ones =
         # TODO
 
-    def Fx55(self) -> None:
+    def _Fx55(self) -> None:
         """
         Fx55 - LD [I], Vx
         Store registers V0 through Vx in memory starting at location I.
@@ -597,7 +658,7 @@ class CHIP8Interpreter:
         for i in range(vx):
             self.memory[self.I + i] = self.gpio[i]
 
-    def Fx65(self) -> None:
+    def _Fx65(self) -> None:
         """
         Fx65 - LD Vx, [I]
         Read registers V0 through Vx from memory starting at location I.
@@ -607,6 +668,10 @@ class CHIP8Interpreter:
         vx = self.extract_Vx()
         for i in range(vx):
             self.gpio[i] = self.memory[self.I + i]
+
+    def _unknown_op_code(self) -> None:
+        """Not real op code"""
+        print("Unknown op code %s, %s", bin(self.op_code), hex(self.op_code))
 
 
 if __name__ == "__main__":
