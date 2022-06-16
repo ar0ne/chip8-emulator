@@ -70,22 +70,7 @@ class CHIP8Interpreter:
         # memory 4kb by 8 bits
         self.memory = [0] * 4096
         # 8 bits registers (GPIO)
-        self.v0 = 0
-        self.v1 = 0
-        self.v2 = 0
-        self.v3 = 0
-        self.v4 = 0
-        self.v5 = 0
-        self.v6 = 0
-        self.v7 = 0
-        self.v8 = 0
-        self.v9 = 0
-        self.vA = 0
-        self.vB = 0
-        self.vC = 0
-        self.vD = 0
-        self.vE = 0
-        self.vF = 0  # should not be used by any programs
+        self.gpio = [0] * 16
         # 16 bit (This register is generally used to store memory addresses, so only the
         # lowest (rightmost) 12 bits are usually used)
         self.I = 0
@@ -146,6 +131,14 @@ class CHIP8Interpreter:
         if self.program_counter >= 4096:
             self.working = False
 
+    def extract_Vx(self) -> int:
+        """Extract Vx from op code"""
+        return (self.op_code & 0x0F00) >> 8
+
+    def extract_Vy(self) -> int:
+        """Extract Vy from op code"""
+        return (self.op_code & 0x00F0) >> 4
+
     def _process_op_code(self) -> None:
         """
         Process operational code.
@@ -191,10 +184,6 @@ class CHIP8Interpreter:
         Fx33 - LD B, Vx
         Fx55 - LD [I], Vx
         Fx65 - LD Vx, [I]
-
-        0x0010:
-            0x0010 & 0xf000 = 0x0000
-            0x0010 & 0x0f0f = 0x0000 => 00E0
         """
 
         code = self.op_code & 0xF000
@@ -271,10 +260,9 @@ class CHIP8Interpreter:
         The interpreter compares register Vx to kk, and if they are equal, increments the program
         counter by 2.
         """
-        # TODO: is it correct?
         kk = self.op_code & 0x00FF
-        Vx = self.op_code & 0x0F00  # how to get which v0-VF it is?
-        if kk == Vx:
+        Vx = self.extract_Vx()
+        if kk == self.gpio[Vx]:
             self.program_counter += 2
 
     def _4xkk(self) -> None:
@@ -283,7 +271,10 @@ class CHIP8Interpreter:
         The interpreter compares register Vx to kk, and if they are not equal, increments the
         program counter by 2.
         """
-        # TODO
+        kk = self.op_code & 0x00FF
+        Vx = self.extract_Vx()
+        if self.gpio[Vx] != kk:
+            self.program_counter += 2
 
     def _5xy0(self) -> None:
         """
@@ -293,7 +284,10 @@ class CHIP8Interpreter:
         The interpreter compares register Vx to register Vy, and if they are equal, increments
         the program counter by 2.
         """
-        # TODO
+        Vx = self.extract_Vx()
+        Vy = (self.op_code & 0x00F0) >> 4
+        if self.gpio[Vx] == self.gpio[Vy]:
+            self.program_counter += 2
 
     def _6xkk(self) -> None:
         """
@@ -302,7 +296,9 @@ class CHIP8Interpreter:
 
         The interpreter puts the value kk into register Vx.
         """
-        # TODO
+        kk = self.op_code & 0x00FF
+        Vx = self.extract_Vx()
+        self.gpio[Vx] = kk
 
     def _7xkk(self) -> None:
         """
@@ -311,7 +307,9 @@ class CHIP8Interpreter:
 
         Adds the value kk to the value of register Vx, then stores the result in Vx.
         """
-        # TODO
+        kk = self.op_code & 0x00FF
+        Vx = self.extract_Vx()
+        self.gpio[Vx] += kk
 
     def _8xy0(self) -> None:
         """
@@ -320,7 +318,9 @@ class CHIP8Interpreter:
 
         Stores the value of register Vy in register Vx.
         """
-        # TODO
+        Vx = self.extract_Vx()
+        Vy = self.extract_Vy()
+        self.gpio[Vx] = self.gpio[Vy]
 
     def _8xy1(self) -> None:
         """
@@ -331,7 +331,9 @@ class CHIP8Interpreter:
         OR compares the corresponding bits from two values, and if either bit is 1, then the same
         bit in the result is also 1. Otherwise, it is 0.
         """
-        # TODO
+        vx = self.extract_Vx()
+        vy = self.extract_Vy()
+        self.gpio[vx] |= self.gpio[vy]
 
     def _8xy2(self) -> None:
         """
@@ -342,7 +344,9 @@ class CHIP8Interpreter:
         AND compares the corresponding bits from two values, and if both bits are 1, then the same
         bit in the result is also 1. Otherwise, it is 0.
         """
-        # TODO
+        vx = self.extract_Vx()
+        vy = self.extract_Vy()
+        self.gpio[vx] &= self.gpio[vy]
 
     def _8xy3(self) -> None:
         """
@@ -353,7 +357,9 @@ class CHIP8Interpreter:
         An exclusive OR compares the corresponding bits from two values, and if the bits are not
         both the same, then the corresponding bit in the result is set to 1. Otherwise, it is 0.
         """
-        # TODO
+        vx = self.extract_Vx()
+        vy = self.extract_Vy()
+        self.gpio[vx] ^= self.gpio[vy]
 
     def _8xy4(self) -> None:
         """
@@ -364,7 +370,11 @@ class CHIP8Interpreter:
         (i.e., > 255,) VF is set to 1, otherwise 0. Only the lowest 8 bits of the result are kept,
         and stored in Vx.
         """
-        # TODO
+        vx = self.extract_Vx()
+        vy = self.extract_Vy()
+        sum = vx + vy
+        self.gpio[15] = 1 if sum > 0xFF else 0  # VF
+        self.gpio[vx] += sum & 0xFF  # 256 & 0xFF == 0b0, is it ok to not have 8bits?
 
     def _8xy5(self) -> None:
         """
@@ -423,7 +433,8 @@ class CHIP8Interpreter:
 
         The value of register I is set to nnn.
         """
-        # TODO
+        nnn = self.op_code & 0x0FFF
+        self.I = nnn
 
     def _Bnnn(self) -> None:
         """
