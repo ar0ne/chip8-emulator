@@ -1,6 +1,7 @@
 """
 CHIP-8 Interpreter.
 """
+import random
 from collections import deque
 
 # 16 x 5
@@ -53,6 +54,8 @@ class CHIP8Interpreter:
                                     Sound
         A beeping sound is played when the value of the sound timer is nonzero.
     """
+
+    VF = 15
 
     def __init__(self) -> None:
         """Init VM"""
@@ -373,7 +376,7 @@ class CHIP8Interpreter:
         vx = self.extract_Vx()
         vy = self.extract_Vy()
         sum = vx + vy
-        self.gpio[15] = 1 if sum > 0xFF else 0  # VF
+        self.gpio[self.VF] = 1 if sum > 0xFF else 0  # VF
         self.gpio[vx] += sum & 0xFF  # 256 & 0xFF == 0b0, is it ok to not have 8bits?
 
     def _8xy5(self) -> None:
@@ -384,7 +387,10 @@ class CHIP8Interpreter:
         If Vx > Vy, then VF is set to 1, otherwise 0. Then Vy is subtracted from Vx, and the
         results stored in Vx.
         """
-        # TODO
+        vx = self.extract_Vx()
+        vy = self.extract_Vy()
+        self.gpio[self.VF] = 1 if self.gpio[vx] > self.gpio[vy] else 0
+        self.gpio[vx] -= self.gpio[vy]
 
     def _8xy6(self) -> None:
         """
@@ -394,7 +400,11 @@ class CHIP8Interpreter:
         If the least-significant bit of Vx is 1, then VF is set to 1, otherwise 0. Then Vx is
         divided by 2.
         """
-        # TODO
+        # TODO: do we need Vy here?
+        vx = self.extract_Vx()
+        least_significant_bit_of_vx = vx & 1
+        self.gpio[self.VF] = 1 if least_significant_bit_of_vx == 1 else 0
+        self.gpio[vx] >>= 1
 
     def _8xy7(self) -> None:
         """
@@ -404,7 +414,10 @@ class CHIP8Interpreter:
         If Vy > Vx, then VF is set to 1, otherwise 0. Then Vx is subtracted from Vy, and the results
         stored in Vx.
         """
-        # TODO
+        vx = self.extract_Vx()
+        vy = self.extract_Vy()
+        self.gpio[self.VF] = 1 if self.gpio[vy] > self.gpio[vx] else 0
+        self.gpio[vx] = vy - vx
 
     def _8xyE(self) -> None:
         """
@@ -414,6 +427,8 @@ class CHIP8Interpreter:
         If the most-significant bit of Vx is 1, then VF is set to 1, otherwise to 0. Then Vx is
         multiplied by 2.
         """
+        vx = self.extract_Vx()
+        # most_significant_bit_of_vx =
         # TODO
 
     def _9xy0(self) -> None:
@@ -424,7 +439,10 @@ class CHIP8Interpreter:
         The values of Vx and Vy are compared, and if they are not equal, the program counter is
         increased by 2.
         """
-        # TODO
+        vx = self.extract_Vx()
+        vy = self.extract_Vy()
+        if vx != vy:
+            self.program_counter += 2
 
     def _Annn(self) -> None:
         """
@@ -443,7 +461,8 @@ class CHIP8Interpreter:
 
         The program counter is set to nnn plus the value of V0.
         """
-        # TODO
+        nnn = self.op_code & 0x0FFF
+        self.program_counter = nnn + self.gpio[0]
 
     def _Cxkk(self) -> None:
         """
@@ -451,9 +470,12 @@ class CHIP8Interpreter:
         Set Vx = random byte AND kk.
 
         The interpreter generates a random number from 0 to 255, which is then ANDed with the value
-         kk. The results are stored in Vx. See instruction 8xy2 for more information on AND.
+        kk. The results are stored in Vx. See instruction 8xy2 for more information on AND.
         """
-        # TODO
+        random_byte = random.randint(0, 0xFF)
+        vx = self.extract_Vx()
+        kk = self.op_code & 0x00FF
+        self.gpio[vx] = random_byte & kk
 
     def _Dxyn(self) -> None:
         """
@@ -497,7 +519,8 @@ class CHIP8Interpreter:
 
         The value of DT is placed into Vx.
         """
-        # TODO
+        vx = self.extract_Vx()
+        self.gpio[vx] = self.delay_timer
 
     def _Fx0A(self) -> None:
         """
@@ -515,7 +538,8 @@ class CHIP8Interpreter:
 
         DT is set equal to the value of Vx.
         """
-        # TODO
+        vx = self.extract_Vx()
+        self.delay_timer = self.gpio[vx]
 
     def _Fx18(self) -> None:
         """
@@ -524,7 +548,8 @@ class CHIP8Interpreter:
 
         ST is set equal to the value of Vx.
         """
-        # TODO
+        vx = self.extract_Vx()
+        self.sound_timer = self.gpio[vx]
 
     def Fx1E(self) -> None:
         """
@@ -533,7 +558,8 @@ class CHIP8Interpreter:
 
         The values of I and Vx are added, and the results are stored in I.
         """
-        # TODO
+        vx = self.extract_Vx()
+        self.I += vx
 
     def Fx29(self) -> None:
         """
@@ -553,6 +579,10 @@ class CHIP8Interpreter:
         The interpreter takes the decimal value of Vx, and places the hundreds digit in memory at
         location in I, the tens digit at location I+1, and the ones digit at location I+2.
         """
+        vx = self.extract_Vx()
+        # hundreds =
+        # tens =
+        # ones =
         # TODO
 
     def Fx55(self) -> None:
@@ -563,7 +593,9 @@ class CHIP8Interpreter:
         The interpreter copies the values of registers V0 through Vx into memory, starting at the
         address in I.
         """
-        # TODO
+        vx = self.extract_Vx()
+        for i in range(vx):
+            self.memory[self.I + i] = self.gpio[i]
 
     def Fx65(self) -> None:
         """
@@ -572,7 +604,9 @@ class CHIP8Interpreter:
 
         The interpreter reads values from memory starting at location I into registers V0 through Vx
         """
-        # TODO
+        vx = self.extract_Vx()
+        for i in range(vx):
+            self.gpio[i] = self.memory[self.I + i]
 
 
 if __name__ == "__main__":
