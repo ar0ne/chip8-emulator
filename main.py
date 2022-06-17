@@ -1,10 +1,13 @@
 """
 CHIP-8 Interpreter.
 """
+import os
 import random
 from collections import defaultdict, deque
 
 # 16 x 5
+from time import sleep
+
 FONTS = [
     0xF0,
     0x90,
@@ -162,8 +165,18 @@ class CHIP8Interpreter:
 
     def draw(self) -> None:
         """Update display"""
-        if self.drawing:
-            pass
+        if not self.drawing:
+            return
+        os.system("clear")  # clear screen
+        lines = []
+        for col in range(32):
+            line = []
+            for row in range(64):
+                line.append("*" if self.display[row + col * 64] else ".")
+            lines.append("".join(line))
+        print("\n".join(lines))
+        self.drawing = False
+        # sleep(1)
 
     def process(self) -> None:
         """Read op code and process it"""
@@ -243,7 +256,7 @@ class CHIP8Interpreter:
     def _run_instruction(self, code: int) -> None:
         """Maps code to known op codes"""
         func = self.OPS_MAPPING[code]
-        print(func.__name__)
+        # print(func.__name__)
         func()
 
     def _0000(self) -> None:
@@ -541,7 +554,24 @@ class CHIP8Interpreter:
         information on XOR, and section 2.4, Display, for more information on the Chip-8 screen
         and sprites.
         """
-        # TODO
+        vx = self.extract_Vx()
+        vy = self.extract_Vy()
+        coord_x = self.gpio[vx] & 0xFF  # 0..63
+        coord_y = self.gpio[vy] & 0xFF  # 0..31 pixels
+        nibble = self.op_code & 0x000F
+        sprite = self.memory[self.I : self.I + nibble]
+        erased = False
+        for i in range(nibble):
+            idx = coord_x + coord_y * 64
+            old_value = self.display[idx]
+            new_value = old_value ^ sprite[i]
+            if old_value and not new_value:
+                erased = True
+            self.display[idx] ^= sprite[i]
+            # TODO: should we care about opposite side of the screen?
+            # How to draw sprite???
+
+        self.gpio[self.VF] = 1 if erased else 0
 
     def _E000(self) -> None:
         """Not real op code"""
@@ -630,7 +660,9 @@ class CHIP8Interpreter:
         The value of I is set to the location for the hexadecimal sprite corresponding to the value
         of Vx. See section 2.4, Display, for more information on the Chip-8 hexadecimal font.
         """
-        # TODO
+        vx = self.extract_Vx()
+        # Each Font has 5 hex numbers, what do expect here?
+        # TODO:
 
     def _Fx33(self) -> None:
         """
@@ -641,10 +673,14 @@ class CHIP8Interpreter:
         location in I, the tens digit at location I+1, and the ones digit at location I+2.
         """
         vx = self.extract_Vx()
-        # hundreds =
-        # tens =
-        # ones =
-        # TODO
+        hundreds = (vx & 0b0100) >> 2
+        tens = (vx & 0b0010) >> 1
+        ones = vx & 1
+        self.memory[self.I], self.memory[self.I + 1], self.memory[self.I + 2] = (
+            hundreds,
+            tens,
+            ones,
+        )
 
     def _Fx55(self) -> None:
         """
