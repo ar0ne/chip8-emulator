@@ -1,14 +1,11 @@
 """
 CHIP-8 Interpreter.
 """
-import os
 import random
 from collections import defaultdict, deque
 
 import pygame
-
-# 16 x 5
-from pygame.constants import K_ESCAPE
+from pygame import constants as pygame_constants
 
 FONTS = [
     0xF0,
@@ -17,7 +14,34 @@ FONTS = [
     0x90,
     0xF0,  # 0
     # 0 - 9, A - F
-]
+]  # 16 x 5
+
+"""
+16-key hexadecimal keypad with the following layout.
+
+1, 2, 3, C,
+4, 5, 6, D,
+7, 8, 9, E,
+A, 0, B, F,
+"""
+KEYBOARD = {
+    pygame_constants.K_1: 0x1,
+    pygame_constants.K_2: 0x2,
+    pygame_constants.K_3: 0x3,
+    pygame_constants.K_4: 0xC,
+    pygame_constants.K_q: 0x4,
+    pygame_constants.K_w: 0x5,
+    pygame_constants.K_e: 0x6,
+    pygame_constants.K_r: 0xD,
+    pygame_constants.K_a: 0x7,
+    pygame_constants.K_s: 0x8,
+    pygame_constants.K_d: 0x9,
+    pygame_constants.K_f: 0xE,
+    pygame_constants.K_z: 0xA,
+    pygame_constants.K_x: 0,
+    pygame_constants.K_c: 0xB,
+    pygame_constants.K_v: 0xF,
+}
 
 WHITE = (255, 255, 255)
 
@@ -95,6 +119,8 @@ class CHIP8Interpreter:
         self.working = False
         self.drawing = True
 
+        self.pressed_key = set()
+
         # load fonts set into memory
         for i, font in enumerate(FONTS):
             self.memory[i] = font
@@ -164,13 +190,16 @@ class CHIP8Interpreter:
                 i += 1
                 byte = f.read(1)
 
-    def start(self) -> None:
-        """Start program"""
+    def run(self) -> None:
+        """Run program"""
         self.working = True
         while self.working:
             self.process_op_code()
             self.read_keyboard()
             self.draw()
+            # if self.pressed_key:
+            #     print(self.pressed_key)
+        pygame.quit()
 
     def draw(self) -> None:
         """Update display"""
@@ -208,8 +237,12 @@ class CHIP8Interpreter:
     def read_keyboard(self) -> None:
         """Read from keyboard"""
         pygame.event.pump()
-        keys = pygame.key.get_pressed()
-        if keys[K_ESCAPE]:
+        pressed = pygame.key.get_pressed()
+        self.pressed_key.clear()
+        for key in KEYBOARD.keys():
+            if pressed[key]:
+                self.pressed_key.add(KEYBOARD[key])
+        if pressed[pygame_constants.K_ESCAPE]:
             self.working = False
 
     def extract_Vx(self) -> int:
@@ -613,7 +646,9 @@ class CHIP8Interpreter:
         Checks the keyboard, and if the key corresponding to the value of Vx is currently in the up
         position, PC is increased by 2.
         """
-        # TODO
+        Vx = self.extract_Vx()
+        if Vx not in self.pressed_key:
+            self.program_counter += 2
 
     def _F000(self) -> None:
         """Not real op code"""
@@ -637,7 +672,14 @@ class CHIP8Interpreter:
 
         All execution stops until a key is pressed, then the value of that key is stored in Vx.
         """
-        # TODO
+        while True:
+            pygame.event.wait()
+            for event in pygame.event.get():
+                if event.type == pygame.KEYDOWN and event.key in KEYBOARD.keys():
+                    # why we might need to set Vx here?
+                    # is Vx shareable between op codes?
+                    Vx = KEYBOARD[event.key]
+                    return
 
     def _Fx15(self) -> None:
         """
@@ -730,4 +772,4 @@ class CHIP8Interpreter:
 if __name__ == "__main__":
     interpreter = CHIP8Interpreter()
     interpreter.load_rom("rom/TETRIS.ch8")
-    interpreter.start()
+    interpreter.run()
