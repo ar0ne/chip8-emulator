@@ -151,7 +151,7 @@ class CHIP8Interpreter:
                 0x5000: self._5xy0,
                 0x6000: self._6xkk,
                 0x7000: self._7xkk,
-                0x8000: self._8xy0,
+                0x8000: self._8000,
                 0x8001: self._8xy1,
                 0x8002: self._8xy2,
                 0x8003: self._8xy3,
@@ -168,6 +168,7 @@ class CHIP8Interpreter:
                 0xE000: self._E000,
                 0xE09E: self._Ex9E,
                 0xE0A1: self._ExA1,
+                0xF000: self._F000,
                 0xF007: self._Fx07,
                 0xF00A: self._Fx0A,
                 0xF015: self._Fx15,
@@ -433,6 +434,14 @@ class CHIP8Interpreter:
         """
         kk = self.op_code & 0x00FF
         self.gpio[self.vx] += kk
+
+    def _8000(self) -> None:
+        """Not real op code"""
+        code = self.op_code & 0xF00F
+        if code == 0x8000:
+            self._8xy0()
+        else:
+            self._run_instruction(code)
 
     def _8xy0(self) -> None:
         """
