@@ -55,6 +55,7 @@ KEYBOARD = {
     pygame_constants.K_v: 0xF,
 }
 
+BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 
 
@@ -129,7 +130,7 @@ class CHIP8Interpreter:
         self.stack_counter = 0
         #
         self.working = False
-        self.drawing = True
+        self.drawing = False
 
         self.pressed_key = set()
 
@@ -226,6 +227,7 @@ class CHIP8Interpreter:
 
     def draw(self) -> None:
         """Update display"""
+
         if not self.drawing:
             return
 
@@ -236,7 +238,11 @@ class CHIP8Interpreter:
                         self.screen, WHITE, pygame.Rect(row * 10, col * 10, 10, 10)
                     )
 
+        # TODO: is it correct?
+        pygame.display.update()
         pygame.display.flip()
+
+        self.drawing = False
 
     def process_op_code(self) -> None:
         """Read op code and process it"""
@@ -328,10 +334,10 @@ class CHIP8Interpreter:
         There are 3 instructions that starts from 0x0XXX.
         """
         code = self.op_code & 0xF0FF
-        if code in (0x00E0, 0x00EE):
-            self._run_instruction(code)
-        else:
+        if code == 0x0000:
             self._0nnn()
+        else:
+            self._run_instruction(code)
 
     def _00E0(self) -> None:
         """
@@ -619,6 +625,7 @@ class CHIP8Interpreter:
             # How to draw sprite???
 
         self.gpio[self.VF] = 1 if erased else 0
+        self.drawing = True
 
     def _E000(self) -> None:
         """Not real op code"""
@@ -756,6 +763,10 @@ class CHIP8Interpreter:
     def _unknown_op_code(self) -> None:
         """Not real op code"""
         print("Unknown op code %s, %s", bin(self.op_code), hex(self.op_code))
+
+    def clear_screen(self) -> None:
+        """Clear screen"""
+        self.screen.fill(BLACK)
 
 
 if __name__ == "__main__":
