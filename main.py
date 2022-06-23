@@ -7,14 +7,26 @@ from collections import defaultdict, deque
 import pygame
 from pygame import constants as pygame_constants
 
-FONTS = [
-    0xF0,
-    0x90,
-    0x90,
-    0x90,
-    0xF0,  # 0
-    # 0 - 9, A - F
+# fmt: off
+FONTS =  [
+    0xF0, 0x90, 0x90, 0x90, 0xF0,  # 0
+    0x20, 0x60, 0x20, 0x20, 0x70,  # 1
+    0xF0, 0x10, 0xF0, 0x80, 0xF0,  # 2
+    0xF0, 0x10, 0xF0, 0x10, 0xF0,  # 3
+    0x90, 0x90, 0xF0, 0x10, 0x10,  # 4
+    0xF0, 0x80, 0xF0, 0x10, 0xF0,  # 5
+    0xF0, 0x80, 0xF0, 0x90, 0xF0,  # 6
+    0xF0, 0x10, 0x20, 0x40, 0x40,  # 7
+    0xF0, 0x90, 0xF0, 0x90, 0xF0,  # 8
+    0xF0, 0x90, 0xF0, 0x10, 0xF0,  # 9
+    0xF0, 0x90, 0xF0, 0x90, 0x90,  # A
+    0xE0, 0x90, 0xE0, 0x90, 0xE0,  # B
+    0xF0, 0x80, 0x80, 0x80, 0xF0,  # C
+    0xE0, 0x90, 0x90, 0x90, 0xE0,  # D
+    0xF0, 0x80, 0xF0, 0x80, 0xF0,  # E
+    0xF0, 0x80, 0xF0, 0x80, 0x80   # F
 ]  # 16 x 5
+# fmt: on
 
 """
 16-key hexadecimal keypad with the following layout.
@@ -636,7 +648,9 @@ class CHIP8Interpreter:
         Checks the keyboard, and if the key corresponding to the value of Vx is currently in the
         down position, PC is increased by 2.
         """
-        # TODO
+        Vx = self.extract_Vx()
+        if Vx in self.pressed_key:
+            self.program_counter += 2
 
     def _ExA1(self) -> None:
         """
@@ -672,13 +686,12 @@ class CHIP8Interpreter:
 
         All execution stops until a key is pressed, then the value of that key is stored in Vx.
         """
+        Vx = self.extract_Vx()
         while True:
             pygame.event.wait()
             for event in pygame.event.get():
                 if event.type == pygame.KEYDOWN and event.key in KEYBOARD.keys():
-                    # why we might need to set Vx here?
-                    # is Vx shareable between op codes?
-                    Vx = KEYBOARD[event.key]
+                    self.gpio[Vx] = KEYBOARD[event.key]
                     return
 
     def _Fx15(self) -> None:
@@ -720,8 +733,8 @@ class CHIP8Interpreter:
         of Vx. See section 2.4, Display, for more information on the Chip-8 hexadecimal font.
         """
         vx = self.extract_Vx()
-        # Each Font has 5 hex numbers, what do expect here?
-        # TODO:
+        # each font sprite consists 5 hex numbers, starting from 0 in memory
+        self.I = self.memory[vx * 5]
 
     def _Fx33(self) -> None:
         """
