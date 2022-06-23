@@ -325,6 +325,7 @@ class CHIP8Interpreter:
     def _run_instruction(self, code: int) -> None:
         """Maps code to known op codes"""
         func = self.OPS_MAPPING[code]
+        print(self.gpio)
         print(func.__name__)
         func()
 
@@ -397,7 +398,7 @@ class CHIP8Interpreter:
         counter by 2.
         """
         kk = self.op_code & 0x00FF
-        if kk == self.gpio[self.vx]:
+        if self.gpio[self.vx] == kk:
             self.program_counter += 2
 
     def _4xkk(self) -> None:
@@ -438,7 +439,8 @@ class CHIP8Interpreter:
 
         Adds the value kk to the value of register Vx, then stores the result in Vx.
         """
-        kk = self.op_code & 0x00FF
+        # TODO: should we limit sum in 8 bits (0-255)
+        kk = self.op_code & 0xFF
         self.gpio[self.vx] += kk
 
     def _8000(self) -> None:
@@ -616,6 +618,8 @@ class CHIP8Interpreter:
         erased = False
         for i in range(nibble):
             idx = coord_x + coord_y * 64
+            if idx > len(self.display):
+                continue
             old_value = self.display[idx]
             new_value = old_value ^ sprite[i]
             if old_value and not new_value:
