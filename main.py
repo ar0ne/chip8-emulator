@@ -318,7 +318,7 @@ class CHIP8Interpreter:
     def _run_instruction(self, code: int) -> None:
         """Maps code to known op codes"""
         func = self.OPS_MAPPING[code]
-        # print(func.__name__)
+        print(func.__name__)
         func()
 
     def _0000(self) -> None:
@@ -390,8 +390,8 @@ class CHIP8Interpreter:
         counter by 2.
         """
         kk = self.op_code & 0x00FF
-        Vx = self.extract_Vx()
-        if kk == self.gpio[Vx]:
+        vx = self.extract_Vx()
+        if kk == self.gpio[vx]:
             self.program_counter += 2
 
     def _4xkk(self) -> None:
@@ -401,8 +401,8 @@ class CHIP8Interpreter:
         program counter by 2.
         """
         kk = self.op_code & 0x00FF
-        Vx = self.extract_Vx()
-        if self.gpio[Vx] != kk:
+        vx = self.extract_Vx()
+        if self.gpio[vx] != kk:
             self.program_counter += 2
 
     def _5xy0(self) -> None:
@@ -413,9 +413,9 @@ class CHIP8Interpreter:
         The interpreter compares register Vx to register Vy, and if they are equal, increments
         the program counter by 2.
         """
-        Vx = self.extract_Vx()
-        Vy = (self.op_code & 0x00F0) >> 4
-        if self.gpio[Vx] == self.gpio[Vy]:
+        vx = self.extract_Vx()
+        vy = (self.op_code & 0x00F0) >> 4
+        if self.gpio[vx] == self.gpio[Vy]:
             self.program_counter += 2
 
     def _6xkk(self) -> None:
@@ -426,8 +426,8 @@ class CHIP8Interpreter:
         The interpreter puts the value kk into register Vx.
         """
         kk = self.op_code & 0x00FF
-        Vx = self.extract_Vx()
-        self.gpio[Vx] = kk
+        vx = self.extract_Vx()
+        self.gpio[vx] = kk
 
     def _7xkk(self) -> None:
         """
@@ -437,8 +437,8 @@ class CHIP8Interpreter:
         Adds the value kk to the value of register Vx, then stores the result in Vx.
         """
         kk = self.op_code & 0x00FF
-        Vx = self.extract_Vx()
-        self.gpio[Vx] += kk
+        vx = self.extract_Vx()
+        self.gpio[vx] += kk
 
     def _8xy0(self) -> None:
         """
@@ -447,9 +447,9 @@ class CHIP8Interpreter:
 
         Stores the value of register Vy in register Vx.
         """
-        Vx = self.extract_Vx()
-        Vy = self.extract_Vy()
-        self.gpio[Vx] = self.gpio[Vy]
+        vx = self.extract_Vx()
+        vy = self.extract_Vy()
+        self.gpio[vx] = self.gpio[vy]
 
     def _8xy1(self) -> None:
         """
@@ -648,8 +648,8 @@ class CHIP8Interpreter:
         Checks the keyboard, and if the key corresponding to the value of Vx is currently in the
         down position, PC is increased by 2.
         """
-        Vx = self.extract_Vx()
-        if Vx in self.pressed_key:
+        vx = self.extract_Vx()
+        if vx in self.pressed_key:
             self.program_counter += 2
 
     def _ExA1(self) -> None:
@@ -660,8 +660,8 @@ class CHIP8Interpreter:
         Checks the keyboard, and if the key corresponding to the value of Vx is currently in the up
         position, PC is increased by 2.
         """
-        Vx = self.extract_Vx()
-        if Vx not in self.pressed_key:
+        vx = self.extract_Vx()
+        if vx not in self.pressed_key:
             self.program_counter += 2
 
     def _F000(self) -> None:
@@ -686,12 +686,12 @@ class CHIP8Interpreter:
 
         All execution stops until a key is pressed, then the value of that key is stored in Vx.
         """
-        Vx = self.extract_Vx()
+        vx = self.extract_Vx()
         while True:
             pygame.event.wait()
             for event in pygame.event.get():
                 if event.type == pygame.KEYDOWN and event.key in KEYBOARD.keys():
-                    self.gpio[Vx] = KEYBOARD[event.key]
+                    self.gpio[vx] = KEYBOARD[event.key]
                     return
 
     def _Fx15(self) -> None:
