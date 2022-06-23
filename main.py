@@ -5,8 +5,10 @@ import os
 import random
 from collections import defaultdict, deque
 
+import pygame
+
 # 16 x 5
-from time import sleep
+from pygame.constants import K_ESCAPE
 
 FONTS = [
     0xF0,
@@ -16,6 +18,8 @@ FONTS = [
     0xF0,  # 0
     # 0 - 9, A - F
 ]
+
+WHITE = (255, 255, 255)
 
 
 class CHIP8Interpreter:
@@ -89,7 +93,7 @@ class CHIP8Interpreter:
         self.stack_counter = 0
         #
         self.working = False
-        self.drawing = False
+        self.drawing = True
 
         # load fonts set into memory
         for i, font in enumerate(FONTS):
@@ -138,6 +142,10 @@ class CHIP8Interpreter:
             },
         )
 
+        pygame.init()
+        self.screen = pygame.display.set_mode((640, 320))
+        pygame.display.set_caption("CHIP8 emulator")
+
     def load_rom(self, path_to_rom: str) -> None:
         """
         Load binary from rom file into memory
@@ -160,25 +168,27 @@ class CHIP8Interpreter:
         """Start program"""
         self.working = True
         while self.working:
-            self.process()
+            self.process_op_code()
+            self.read_keyboard()
             self.draw()
 
     def draw(self) -> None:
         """Update display"""
         if not self.drawing:
             return
-        os.system("clear")  # clear screen
-        lines = []
-        for col in range(32):
-            line = []
-            for row in range(64):
-                line.append("*" if self.display[row + col * 64] else ".")
-            lines.append("".join(line))
-        print("\n".join(lines))
-        self.drawing = False
-        # sleep(1)
 
-    def process(self) -> None:
+        self.display[15] = 1
+
+        for col in range(32):
+            for row in range(64):
+                if self.display[row + col * 64]:
+                    pygame.draw.rect(
+                        self.screen, WHITE, pygame.Rect(row * 10, col * 10, 10, 10)
+                    )
+
+        pygame.display.flip()
+
+    def process_op_code(self) -> None:
         """Read op code and process it"""
         # op code consist 2 bytes (16 bits)
         self.op_code = (self.memory[self.program_counter] << 8) | self.memory[
@@ -193,6 +203,13 @@ class CHIP8Interpreter:
         # update timers
 
         if self.program_counter >= 4096:
+            self.working = False
+
+    def read_keyboard(self) -> None:
+        """Read from keyboard"""
+        pygame.event.pump()
+        keys = pygame.key.get_pressed()
+        if keys[K_ESCAPE]:
             self.working = False
 
     def extract_Vx(self) -> int:
