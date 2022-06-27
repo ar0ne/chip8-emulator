@@ -3,6 +3,7 @@ CHIP-8 Interpreter.
 """
 import random
 from collections import defaultdict, deque
+from time import sleep
 
 import pygame
 from pygame import constants as pygame_constants
@@ -221,8 +222,17 @@ class CHIP8Interpreter:
             self.process_op_code()
             self.read_keyboard()
             self.draw()
+            # update timers
+            if self.delay_timer > 0:
+                self.delay_timer -= 1
+            if self.sound_timer > 0:
+                self.sound_timer -= 1
+                if not self.sound_timer:
+                    self.play_sound()
+
             # if self.pressed_key:
             #     print(self.pressed_key)
+            # sleep(1)
         pygame.quit()
 
     def draw(self) -> None:
@@ -254,9 +264,6 @@ class CHIP8Interpreter:
 
         # process op code
         self._process_op_code()
-
-        # update timers
-        # TODO
 
         if self.program_counter >= 4096:
             self.working = False
@@ -603,32 +610,29 @@ class CHIP8Interpreter:
         Dxyn - DRW Vx, Vy, nibble
         Display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision.
 
-        The interpreter reads n bytes from memory, starting at the address stored in I. These bytes
-        are then displayed as sprites on screen at coordinates (Vx, Vy). Sprites are XORed onto the
-        existing screen. If this causes any pixels to be erased, VF is set to 1, otherwise it is set
-        to 0. If the sprite is positioned so part of it is outside the coordinates of the display,
-        it wraps around to the opposite side of the screen. See instruction 8xy3 for more
-        information on XOR, and section 2.4, Display, for more information on the Chip-8 screen
-        and sprites.
+        Draws a sprite at coordinate (VX, VY) that has a width of 8 pixels and a height of N pixels.
+        Each row of 8 pixels is read as bit-coded starting from memory location I;
+        I value doesn't change after the execution of this instruction.
+        VF is set to 1 if any screen pixels are flipped from set to unset when the sprite is drawn,
+        and to 0 if that doesn't happen
         """
-        coord_x = self.gpio[self.vx] & 0xFF  # 0..63
-        coord_y = self.gpio[self.vy] & 0xFF  # 0..31 pixels
-        nibble = self.op_code & 0x000F
-        sprite = self.memory[self.I : self.I + nibble]
-        erased = False
-        for i in range(nibble):
-            idx = coord_x + coord_y * 64
-            if idx > len(self.display):
-                continue
-            old_value = self.display[idx]
-            new_value = old_value ^ sprite[i]
-            if old_value and not new_value:
-                erased = True
-            self.display[idx] ^= sprite[i]
-            # TODO: should we care about opposite side of the screen?
-            # How to draw sprite???
+        x = self.gpio[self.vx] & 0xFF  # 0..63
+        y = self.gpio[self.vy] & 0xFF  # 0..31 pixels
+        height = self.op_code & 0x000F
+        length = 8
+        display_length = len(self.display)  # 2048
+        self.VF = 0
+        for col in range(height):
+            pixel = self.memory[self.I + col]
+            for row in range(length):
+                if not (pixel & (0x80 >> row)):
+                    # bin(0x80) == 0x10000000
+                    continue
+                idx = (((x + row) + (y + col) * 64)) % display_length
+                if self.display[idx] == 1:
+                    self.VF = 1
+                self.display[idx] ^= 1
 
-        self.gpio[self.VF] = 1 if erased else 0
         self.drawing = True
 
     def _E000(self) -> None:
@@ -679,12 +683,11 @@ class CHIP8Interpreter:
 
         All execution stops until a key is pressed, then the value of that key is stored in Vx.
         """
-        while True:
-            pygame.event.wait()
-            for event in pygame.event.get():
-                if event.type == pygame.KEYDOWN and event.key in KEYBOARD.keys():
-                    self.gpio[self.vx] = KEYBOARD[event.key]
-                    return
+        for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN and event.key in KEYBOARD.keys():
+                self.gpio[self.vx] = KEYBOARD[event.key]
+                return
+        self.program_counter -= 2  # cycle until key pressed
 
     def _Fx15(self) -> None:
         """
@@ -772,8 +775,12 @@ class CHIP8Interpreter:
         """Clear screen"""
         self.screen.fill(BLACK)
 
+    def play_sound(self) -> None:
+        """Play buzz sound"""
+        # TODO: play sound file, but how long?
+
 
 if __name__ == "__main__":
     interpreter = CHIP8Interpreter()
-    interpreter.load_rom("rom/TETRIS.ch8")
+    interpreter.load_rom("rom/WALL.ch8")
     interpreter.run()
