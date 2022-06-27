@@ -135,6 +135,8 @@ class CHIP8Interpreter:
 
         self.pressed_key = set()
 
+        self.trace_mode = True
+
         # load fonts set into memory
         for i, font in enumerate(FONTS):
             self.memory[i] = font
@@ -230,8 +232,6 @@ class CHIP8Interpreter:
                 if not self.sound_timer:
                     self.play_sound()
 
-            if self.pressed_key:
-                print(self.pressed_key)
             # sleep(1)
         pygame.quit()
 
@@ -248,8 +248,6 @@ class CHIP8Interpreter:
                         self.screen, WHITE, pygame.Rect(row * 10, col * 10, 10, 10)
                     )
 
-        # TODO: is it correct?
-        pygame.display.update()
         pygame.display.flip()
 
         self.drawing = False
@@ -332,8 +330,10 @@ class CHIP8Interpreter:
     def _run_instruction(self, code: int) -> None:
         """Maps code to known op codes"""
         func = self.OPS_MAPPING[code]
-        print(self.gpio)
-        print(func.__name__)
+
+        if self.trace_mode:
+            print("[%s] %d %.4X" % (func.__name__, self.program_counter, self.op_code))
+
         func()
 
     def _0000(self) -> None:
@@ -373,8 +373,7 @@ class CHIP8Interpreter:
         This instruction is only used on the old computers on which Chip-8 was originally
         implemented. It is ignored by modern interpreters.
         """
-        nnn = self.op_code & 0x0FFF
-        self.program_counter = nnn
+        self.program_counter = self.op_code & 0x0FFF
 
     def _1nnn(self) -> None:
         """
@@ -383,8 +382,7 @@ class CHIP8Interpreter:
 
         The interpreter sets the program counter to nnn.
         """
-        nnn = self.op_code & 0x0FFF
-        self.program_counter = nnn
+        self.program_counter = self.op_code & 0x0FFF
 
     def _2nnn(self) -> None:
         """
@@ -395,8 +393,7 @@ class CHIP8Interpreter:
         stack. The PC is then set to nnn.
         """
         self.stack.append(self.program_counter)
-        nnn = self.op_code & 0x0FFF
-        self.program_counter = nnn
+        self.program_counter = self.op_code & 0x0FFF
 
     def _3xkk(self) -> None:
         """
@@ -436,8 +433,7 @@ class CHIP8Interpreter:
 
         The interpreter puts the value kk into register Vx.
         """
-        kk = self.op_code & 0x00FF
-        self.gpio[self.vx] = kk
+        self.gpio[self.vx] = self.op_code & 0x00FF
 
     def _7xkk(self) -> None:
         """
@@ -446,9 +442,9 @@ class CHIP8Interpreter:
 
         Adds the value kk to the value of register Vx, then stores the result in Vx.
         """
-        # TODO: should we limit sum in 8 bits (0-255)
-        kk = self.op_code & 0xFF
-        self.gpio[self.vx] += kk
+        self.gpio[self.vx] += self.op_code & 0x00FF
+        if self.trace_mode:
+            print("[7xkk] %d" % self.gpio[self.vx])
 
     def _8000(self) -> None:
         """Not real op code"""
@@ -498,6 +494,7 @@ class CHIP8Interpreter:
         An exclusive OR compares the corresponding bits from two values, and if the bits are not
         both the same, then the corresponding bit in the result is set to 1. Otherwise, it is 0.
         """
+        self.VF = 1 if self.gpio[vx] == self.gpio[self.vy] else 0
         self.gpio[self.vx] ^= self.gpio[self.vy]
 
     def _8xy4(self) -> None:
@@ -509,11 +506,10 @@ class CHIP8Interpreter:
         (i.e., > 255,) VF is set to 1, otherwise 0. Only the lowest 8 bits of the result are kept,
         and stored in Vx.
         """
-        sum = self.vx + self.vy
+        sum = self.gpio[self.vx] + self.gpio[self.vy]
         self.gpio[self.VF] = 1 if sum > 0xFF else 0  # VF
-        self.gpio[self.vx] += (
-            sum & 0xFF
-        )  # 256 & 0xFF == 0b0, is it ok to not have 8bits?
+        # 256 & 0xFF == 0b0, is it ok to not have 8bits?
+        self.gpio[self.vx] = sum & 0xFF
 
     def _8xy5(self) -> None:
         """
@@ -523,8 +519,9 @@ class CHIP8Interpreter:
         If Vx > Vy, then VF is set to 1, otherwise 0. Then Vy is subtracted from Vx, and the
         results stored in Vx.
         """
-        self.gpio[self.VF] = 1 if self.gpio[self.vx] > self.gpio[self.vy] else 0
-        self.gpio[self.vx] -= self.gpio[self.vy]
+        sub = self.gpio[self.vx] > self.gpio[self.vy]
+        self.gpio[self.VF] = 1 if sub > 0 else 0
+        self.gpio[self.vx] = sub
 
     def _8xy6(self) -> None:
         """
@@ -534,10 +531,10 @@ class CHIP8Interpreter:
         If the least-significant bit of Vx is 1, then VF is set to 1, otherwise 0. Then Vx is
         divided by 2.
         """
-        # TODO: do we need Vy here?
-        least_significant_bit_of_vx = self.vx & 1
-        self.gpio[self.VF] = 1 if least_significant_bit_of_vx == 1 else 0
+        self.gpio[self.VF] = self.gpio[self.vx] & 0x1
         self.gpio[self.vx] >>= 1
+        if self.trace_mode:
+            print("[8xy6] %.4X" % (self.gpio[self.vx]))
 
     def _8xy7(self) -> None:
         """
@@ -548,7 +545,7 @@ class CHIP8Interpreter:
         stored in Vx.
         """
         self.gpio[self.VF] = 1 if self.gpio[self.vy] > self.gpio[self.vx] else 0
-        self.gpio[self.vx] = self.vy - self.vx
+        self.gpio[self.vx] = self.gpio[self.vy] - self.gpio[self.vx]
 
     def _8xyE(self) -> None:
         """
@@ -559,7 +556,7 @@ class CHIP8Interpreter:
         multiplied by 2.
         """
         # vx - 4 bit (15)
-        self.gpio[self.VF] = 1 if self.vx & 0b1000 else 0
+        self.gpio[self.VF] = 1 if self.gpio[self.vx] & 0b1000 else 0
         self.gpio[self.vx] <<= 1
 
     def _9xy0(self) -> None:
@@ -570,7 +567,7 @@ class CHIP8Interpreter:
         The values of Vx and Vy are compared, and if they are not equal, the program counter is
         increased by 2.
         """
-        if self.vx != self.vy:
+        if self.gpio[self.vx] != self.gpio[self.vy]:
             self.program_counter += 2
 
     def _Annn(self) -> None:
@@ -580,8 +577,7 @@ class CHIP8Interpreter:
 
         The value of register I is set to nnn.
         """
-        nnn = self.op_code & 0x0FFF
-        self.I = nnn
+        self.I = self.op_code & 0x0FFF
 
     def _Bnnn(self) -> None:
         """
@@ -648,7 +644,7 @@ class CHIP8Interpreter:
         Checks the keyboard, and if the key corresponding to the value of Vx is currently in the
         down position, PC is increased by 2.
         """
-        if self.vx in self.pressed_key:
+        if self.gpio[self.vx] in self.pressed_key:
             self.program_counter += 2
 
     def _ExA1(self) -> None:
@@ -659,7 +655,7 @@ class CHIP8Interpreter:
         Checks the keyboard, and if the key corresponding to the value of Vx is currently in the up
         position, PC is increased by 2.
         """
-        if self.vx not in self.pressed_key:
+        if self.gpio[self.vx] not in self.pressed_key:
             self.program_counter += 2
 
     def _F000(self) -> None:
@@ -714,7 +710,7 @@ class CHIP8Interpreter:
 
         The values of I and Vx are added, and the results are stored in I.
         """
-        self.I += self.vx
+        self.I += self.gpio[self.vx]
 
     def _Fx29(self) -> None:
         """
@@ -725,8 +721,7 @@ class CHIP8Interpreter:
         of Vx. See section 2.4, Display, for more information on the Chip-8 hexadecimal font.
         """
         # each font sprite consists 5 hex numbers, starting from 0 in memory
-        # TODO: should it be self.memory[self.gpio[self.vx]] instead?
-        self.I = self.memory[self.vx * 5]
+        self.I = self.gpio[self.vx] * 0x5
 
     def _Fx33(self) -> None:
         """
@@ -736,7 +731,7 @@ class CHIP8Interpreter:
         The interpreter takes the decimal value of Vx, and places the hundreds digit in memory at
         location in I, the tens digit at location I+1, and the ones digit at location I+2.
         """
-        vx = self.vx
+        vx = self.gpio[self.vx]
         hundreds = (vx & 0b0100) >> 2
         tens = (vx & 0b0010) >> 1
         ones = vx & 1
@@ -745,6 +740,8 @@ class CHIP8Interpreter:
             tens,
             ones,
         )
+        if self.trace_mode:
+            print("[FX33] %d, %d, %d" % (hundreds, tens, ones))
 
     def _Fx55(self) -> None:
         """
@@ -756,6 +753,7 @@ class CHIP8Interpreter:
         """
         for i in range(self.vx):
             self.memory[self.I + i] = self.gpio[i]
+        # TODO: set I = I + vx + 1 ???
 
     def _Fx65(self) -> None:
         """
@@ -766,6 +764,8 @@ class CHIP8Interpreter:
         """
         for i in range(self.vx):
             self.gpio[i] = self.memory[self.I + i]
+
+        # TODO: set I = I + vx + 1 ???
 
     def _unknown_op_code(self) -> None:
         """Not real op code"""
