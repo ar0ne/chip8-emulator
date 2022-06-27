@@ -230,8 +230,8 @@ class CHIP8Interpreter:
                 if not self.sound_timer:
                     self.play_sound()
 
-            # if self.pressed_key:
-            #     print(self.pressed_key)
+            if self.pressed_key:
+                print(self.pressed_key)
             # sleep(1)
         pygame.quit()
 
@@ -683,11 +683,11 @@ class CHIP8Interpreter:
 
         All execution stops until a key is pressed, then the value of that key is stored in Vx.
         """
-        for event in pygame.event.get():
-            if event.type == pygame.KEYDOWN and event.key in KEYBOARD.keys():
-                self.gpio[self.vx] = KEYBOARD[event.key]
-                return
-        self.program_counter -= 2  # cycle until key pressed
+        if not self.pressed_key:
+            self.program_counter -= 2  # cycle until key pressed
+
+        for key in self.pressed_key:
+            self.gpio[self.vx] = key
 
     def _Fx15(self) -> None:
         """
