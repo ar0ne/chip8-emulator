@@ -100,7 +100,7 @@ class CHIP8Interpreter:
         A beeping sound is played when the value of the sound timer is nonzero.
     """
 
-    VF = 15
+    VF = 0xF  # 15
     MEMORY_START = 0x200  # 512
 
     def __init__(self) -> None:
@@ -401,8 +401,7 @@ class CHIP8Interpreter:
         The interpreter compares register Vx to kk, and if they are equal, increments the program
         counter by 2.
         """
-        kk = self.op_code & 0x00FF
-        if self.gpio[self.vx] == kk:
+        if self.gpio[self.vx] == self.op_code & 0x00FF:
             self.program_counter += 2
 
     def _4xkk(self) -> None:
@@ -411,8 +410,7 @@ class CHIP8Interpreter:
         The interpreter compares register Vx to kk, and if they are not equal, increments the
         program counter by 2.
         """
-        kk = self.op_code & 0x00FF
-        if self.gpio[self.vx] != kk:
+        if self.gpio[self.vx] != self.op_code & 0x00FF:
             self.program_counter += 2
 
     def _5xy0(self) -> None:
@@ -442,7 +440,8 @@ class CHIP8Interpreter:
 
         Adds the value kk to the value of register Vx, then stores the result in Vx.
         """
-        self.gpio[self.vx] += self.op_code & 0x00FF
+        kk = self.op_code & 0x00FF  # extract the lower 8 bits
+        self.gpio[self.vx] += kk  # TODO: out of memory
         if self.trace_mode:
             print("[7xkk] %d" % self.gpio[self.vx])
 
@@ -494,7 +493,7 @@ class CHIP8Interpreter:
         An exclusive OR compares the corresponding bits from two values, and if the bits are not
         both the same, then the corresponding bit in the result is set to 1. Otherwise, it is 0.
         """
-        self.VF = 1 if self.gpio[vx] == self.gpio[self.vy] else 0
+        self.VF = 1 if self.gpio[self.vx] == self.gpio[self.vy] else 0
         self.gpio[self.vx] ^= self.gpio[self.vy]
 
     def _8xy4(self) -> None:
@@ -507,7 +506,7 @@ class CHIP8Interpreter:
         and stored in Vx.
         """
         sum = self.gpio[self.vx] + self.gpio[self.vy]
-        self.gpio[self.VF] = 1 if sum > 0xFF else 0  # VF
+        self.VF = 1 if sum > 0xFF else 0  # VF
         # 256 & 0xFF == 0b0, is it ok to not have 8bits?
         self.gpio[self.vx] = sum & 0xFF
 
@@ -520,7 +519,7 @@ class CHIP8Interpreter:
         results stored in Vx.
         """
         sub = self.gpio[self.vx] > self.gpio[self.vy]
-        self.gpio[self.VF] = 1 if sub > 0 else 0
+        self.VF = 1 if sub > 0 else 0
         self.gpio[self.vx] = sub
 
     def _8xy6(self) -> None:
@@ -531,7 +530,7 @@ class CHIP8Interpreter:
         If the least-significant bit of Vx is 1, then VF is set to 1, otherwise 0. Then Vx is
         divided by 2.
         """
-        self.gpio[self.VF] = self.gpio[self.vx] & 0x1
+        self.VF = self.gpio[self.vx] & 0x1
         self.gpio[self.vx] >>= 1
         if self.trace_mode:
             print("[8xy6] %.4X" % (self.gpio[self.vx]))
@@ -544,7 +543,7 @@ class CHIP8Interpreter:
         If Vy > Vx, then VF is set to 1, otherwise 0. Then Vx is subtracted from Vy, and the results
         stored in Vx.
         """
-        self.gpio[self.VF] = 1 if self.gpio[self.vy] > self.gpio[self.vx] else 0
+        self.VF = 1 if self.gpio[self.vy] > self.gpio[self.vx] else 0
         self.gpio[self.vx] = self.gpio[self.vy] - self.gpio[self.vx]
 
     def _8xyE(self) -> None:
@@ -556,7 +555,7 @@ class CHIP8Interpreter:
         multiplied by 2.
         """
         # vx - 4 bit (15)
-        self.gpio[self.VF] = 1 if self.gpio[self.vx] & 0b1000 else 0
+        self.VF = 1 if self.gpio[self.vx] & 0b1000 else 0
         self.gpio[self.vx] <<= 1
 
     def _9xy0(self) -> None:
@@ -754,6 +753,7 @@ class CHIP8Interpreter:
         for i in range(self.vx):
             self.memory[self.I + i] = self.gpio[i]
         # TODO: set I = I + vx + 1 ???
+        # self.I += self.gpio[self.vx] + 1
 
     def _Fx65(self) -> None:
         """
@@ -766,6 +766,7 @@ class CHIP8Interpreter:
             self.gpio[i] = self.memory[self.I + i]
 
         # TODO: set I = I + vx + 1 ???
+        # self.I += self.gpio[self.vx] + 1
 
     def _unknown_op_code(self) -> None:
         """Not real op code"""
@@ -778,9 +779,10 @@ class CHIP8Interpreter:
     def play_sound(self) -> None:
         """Play buzz sound"""
         # TODO: play sound file, but how long?
+        print("Sound!")
 
 
 if __name__ == "__main__":
     interpreter = CHIP8Interpreter()
-    interpreter.load_rom("rom/WALL.ch8")
+    interpreter.load_rom("rom/TETRIS.ch8")
     interpreter.run()
