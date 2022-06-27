@@ -136,7 +136,8 @@ class CHIP8Interpreter:
         self.pressed_key = set()
 
         self.trace_mode = True
-
+        # fix FPS
+        self.clock = pygame.time.Clock()
         # load fonts set into memory
         for i, font in enumerate(FONTS):
             self.memory[i] = font
@@ -232,7 +233,7 @@ class CHIP8Interpreter:
                 if not self.sound_timer:
                     self.play_sound()
 
-            # sleep(1)
+            self.clock.tick(180)
         pygame.quit()
 
     def draw(self) -> None:
@@ -241,13 +242,16 @@ class CHIP8Interpreter:
         if not self.drawing:
             return
 
+        # clear screen
+        self.screen.fill((0, 0, 0))
+        # draw current display
         for col in range(32):
             for row in range(64):
                 if self.display[row + col * 64]:
                     pygame.draw.rect(
                         self.screen, WHITE, pygame.Rect(row * 10, col * 10, 10, 10)
                     )
-
+        # update full display to the screen
         pygame.display.flip()
 
         self.drawing = False
@@ -332,7 +336,10 @@ class CHIP8Interpreter:
         func = self.OPS_MAPPING[code]
 
         if self.trace_mode:
-            print("[%s] %d %.4X" % (func.__name__, self.program_counter, self.op_code))
+            print(
+                "[%.4X:%s] %d %.4X"
+                % (code, func.__name__, self.program_counter, self.op_code)
+            )
 
         func()
 
@@ -432,6 +439,7 @@ class CHIP8Interpreter:
         The interpreter puts the value kk into register Vx.
         """
         self.gpio[self.vx] = self.op_code & 0x00FF
+        self.gpio[self.vx] &= 0xFF
 
     def _7xkk(self) -> None:
         """
@@ -441,9 +449,10 @@ class CHIP8Interpreter:
         Adds the value kk to the value of register Vx, then stores the result in Vx.
         """
         kk = self.op_code & 0x00FF  # extract the lower 8 bits
-        self.gpio[self.vx] += kk  # TODO: out of memory
         if self.trace_mode:
-            print("[7xkk] %d" % self.gpio[self.vx])
+            print("[7xkk] %d + %d" % (kk, self.gpio[self.vx]))
+        self.gpio[self.vx] += kk  # TODO: out of memory
+        self.gpio[self.vx] &= 0xFF
 
     def _8000(self) -> None:
         """Not real op code"""
@@ -483,6 +492,7 @@ class CHIP8Interpreter:
         bit in the result is also 1. Otherwise, it is 0.
         """
         self.gpio[self.vx] &= self.gpio[self.vy]
+        self.gpio[self.vx] &= 0xFF
 
     def _8xy3(self) -> None:
         """
@@ -495,6 +505,7 @@ class CHIP8Interpreter:
         """
         self.VF = 1 if self.gpio[self.vx] == self.gpio[self.vy] else 0
         self.gpio[self.vx] ^= self.gpio[self.vy]
+        self.gpio[self.vx] &= 0xFF
 
     def _8xy4(self) -> None:
         """
@@ -509,6 +520,7 @@ class CHIP8Interpreter:
         self.VF = 1 if sum > 0xFF else 0  # VF
         # 256 & 0xFF == 0b0, is it ok to not have 8bits?
         self.gpio[self.vx] = sum & 0xFF
+        self.gpio[self.vx] &= 0xFF
 
     def _8xy5(self) -> None:
         """
@@ -521,6 +533,7 @@ class CHIP8Interpreter:
         sub = self.gpio[self.vx] > self.gpio[self.vy]
         self.VF = 1 if sub > 0 else 0
         self.gpio[self.vx] = sub
+        self.gpio[self.vx] &= 0xFF
 
     def _8xy6(self) -> None:
         """
@@ -532,6 +545,7 @@ class CHIP8Interpreter:
         """
         self.VF = self.gpio[self.vx] & 0x1
         self.gpio[self.vx] >>= 1
+        self.gpio[self.vx] &= 0xFF
         if self.trace_mode:
             print("[8xy6] %.4X" % (self.gpio[self.vx]))
 
@@ -545,6 +559,7 @@ class CHIP8Interpreter:
         """
         self.VF = 1 if self.gpio[self.vy] > self.gpio[self.vx] else 0
         self.gpio[self.vx] = self.gpio[self.vy] - self.gpio[self.vx]
+        self.gpio[self.vx] &= 0xFF
 
     def _8xyE(self) -> None:
         """
@@ -557,6 +572,7 @@ class CHIP8Interpreter:
         # vx - 4 bit (15)
         self.VF = 1 if self.gpio[self.vx] & 0b1000 else 0
         self.gpio[self.vx] <<= 1
+        self.gpio[self.vx] &= 0xFF
 
     def _9xy0(self) -> None:
         """
@@ -599,6 +615,7 @@ class CHIP8Interpreter:
         random_byte = random.randint(0, 0xFF)
         kk = self.op_code & 0x00FF
         self.gpio[self.vx] = random_byte & kk
+        self.gpio[self.vx] &= 0xFF
 
     def _Dxyn(self) -> None:
         """
@@ -683,6 +700,7 @@ class CHIP8Interpreter:
 
         for key in self.pressed_key:
             self.gpio[self.vx] = key
+            print("Fx0A >>>>")
 
     def _Fx15(self) -> None:
         """
@@ -784,5 +802,5 @@ class CHIP8Interpreter:
 
 if __name__ == "__main__":
     interpreter = CHIP8Interpreter()
-    interpreter.load_rom("rom/TETRIS.ch8")
+    interpreter.load_rom("rom/WALL.ch8")
     interpreter.run()
