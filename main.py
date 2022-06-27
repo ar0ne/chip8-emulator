@@ -129,7 +129,6 @@ class CHIP8Interpreter:
         self.program_counter = self.MEMORY_START
         # The stack pointer can be 8-bit, it is used to point to the topmost level of the stack
         self.stack_counter = 0
-        #
         self.working = False
         self.drawing = False
 
@@ -222,8 +221,8 @@ class CHIP8Interpreter:
         """Run program"""
         self.working = True
         while self.working:
-            self.process_op_code()
             self.read_keyboard()
+            self.process_op_code()
             self.draw()
             # update timers
             if self.delay_timer > 0:
@@ -438,7 +437,8 @@ class CHIP8Interpreter:
 
         The interpreter puts the value kk into register Vx.
         """
-        self.gpio[self.vx] = self.op_code & 0x00FF
+        kk = self.op_code & 0x00FF  # extract the lower 8 bits
+        self.gpio[self.vx] = kk
         self.gpio[self.vx] &= 0xFF
 
     def _7xkk(self) -> None:
@@ -449,9 +449,7 @@ class CHIP8Interpreter:
         Adds the value kk to the value of register Vx, then stores the result in Vx.
         """
         kk = self.op_code & 0x00FF  # extract the lower 8 bits
-        if self.trace_mode:
-            print("[7xkk] %d + %d" % (kk, self.gpio[self.vx]))
-        self.gpio[self.vx] += kk  # TODO: out of memory
+        self.gpio[self.vx] += kk
         self.gpio[self.vx] &= 0xFF
 
     def _8000(self) -> None:
@@ -481,6 +479,8 @@ class CHIP8Interpreter:
         bit in the result is also 1. Otherwise, it is 0.
         """
         self.gpio[self.vx] |= self.gpio[self.vy]
+        self.gpio[self.vx] &= 0xFF
+        self.VF = 0
 
     def _8xy2(self) -> None:
         """
@@ -493,6 +493,7 @@ class CHIP8Interpreter:
         """
         self.gpio[self.vx] &= self.gpio[self.vy]
         self.gpio[self.vx] &= 0xFF
+        self.VF = 0
 
     def _8xy3(self) -> None:
         """
@@ -503,9 +504,9 @@ class CHIP8Interpreter:
         An exclusive OR compares the corresponding bits from two values, and if the bits are not
         both the same, then the corresponding bit in the result is set to 1. Otherwise, it is 0.
         """
-        self.VF = 1 if self.gpio[self.vx] == self.gpio[self.vy] else 0
         self.gpio[self.vx] ^= self.gpio[self.vy]
         self.gpio[self.vx] &= 0xFF
+        self.VF = 0
 
     def _8xy4(self) -> None:
         """
@@ -520,7 +521,6 @@ class CHIP8Interpreter:
         self.VF = 1 if sum > 0xFF else 0  # VF
         # 256 & 0xFF == 0b0, is it ok to not have 8bits?
         self.gpio[self.vx] = sum & 0xFF
-        self.gpio[self.vx] &= 0xFF
 
     def _8xy5(self) -> None:
         """
@@ -530,7 +530,7 @@ class CHIP8Interpreter:
         If Vx > Vy, then VF is set to 1, otherwise 0. Then Vy is subtracted from Vx, and the
         results stored in Vx.
         """
-        sub = self.gpio[self.vx] > self.gpio[self.vy]
+        sub = self.gpio[self.vx] - self.gpio[self.vy]
         self.VF = 1 if sub > 0 else 0
         self.gpio[self.vx] = sub
         self.gpio[self.vx] &= 0xFF
@@ -559,7 +559,6 @@ class CHIP8Interpreter:
         """
         self.VF = 1 if self.gpio[self.vy] > self.gpio[self.vx] else 0
         self.gpio[self.vx] = self.gpio[self.vy] - self.gpio[self.vx]
-        self.gpio[self.vx] &= 0xFF
 
     def _8xyE(self) -> None:
         """
@@ -601,8 +600,7 @@ class CHIP8Interpreter:
 
         The program counter is set to nnn plus the value of V0.
         """
-        nnn = self.op_code & 0x0FFF
-        self.program_counter = nnn + self.gpio[0]
+        self.program_counter = self.op_code & 0x0FFF + self.gpio[0]
 
     def _Cxkk(self) -> None:
         """
@@ -727,6 +725,7 @@ class CHIP8Interpreter:
 
         The values of I and Vx are added, and the results are stored in I.
         """
+        self.VF = 1 if self.VF + self.gpio[self.vx] > 0xFFF else 0
         self.I += self.gpio[self.vx]
 
     def _Fx29(self) -> None:
@@ -770,8 +769,7 @@ class CHIP8Interpreter:
         """
         for i in range(self.vx):
             self.memory[self.I + i] = self.gpio[i]
-        # TODO: set I = I + vx + 1 ???
-        # self.I += self.gpio[self.vx] + 1
+        self.I = self.I + self.gpio[self.vx] + 1
 
     def _Fx65(self) -> None:
         """
@@ -782,9 +780,7 @@ class CHIP8Interpreter:
         """
         for i in range(self.vx):
             self.gpio[i] = self.memory[self.I + i]
-
-        # TODO: set I = I + vx + 1 ???
-        # self.I += self.gpio[self.vx] + 1
+        self.I = self.I + self.gpio[self.vx] + 1
 
     def _unknown_op_code(self) -> None:
         """Not real op code"""
@@ -802,5 +798,5 @@ class CHIP8Interpreter:
 
 if __name__ == "__main__":
     interpreter = CHIP8Interpreter()
-    interpreter.load_rom("rom/WALL.ch8")
+    interpreter.load_rom("rom/TETRIS.ch8")
     interpreter.run()
