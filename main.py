@@ -3,12 +3,12 @@ CHIP-8 Interpreter.
 """
 import random
 from collections import defaultdict, deque
-from time import sleep
 
 import pygame
 from pygame import constants as pygame_constants
 
 # fmt: off
+FONST_SIZE_IN_BYTES = 0x5
 FONTS =  [
     0xF0, 0x90, 0x90, 0x90, 0xF0,  # 0
     0x20, 0x60, 0x20, 0x20, 0x70,  # 1
@@ -58,6 +58,9 @@ KEYBOARD = {
 
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
+
+SCREEN_WIDTH = 640
+SCREEN_HEIGHT = 320
 
 
 class CHIP8Interpreter:
@@ -116,6 +119,7 @@ class CHIP8Interpreter:
         self.stack = deque()
         # display monochrome with resolution 64x32 pixels
         self.display = [0] * 64 * 32
+        self.display_length = len(self.display)  # 2048
         # memory 4kb by 8 bits
         self.memory = [0] * 4096
         # 8 bits registers (GPIO)
@@ -186,7 +190,7 @@ class CHIP8Interpreter:
         )
 
         pygame.init()
-        self.screen = pygame.display.set_mode((640, 320))
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("CHIP8 emulator")
 
     @property
@@ -242,7 +246,7 @@ class CHIP8Interpreter:
             return
 
         # clear screen
-        self.screen.fill((0, 0, 0))
+        self.clear_screen()
         # draw current display
         for col in range(32):
             for row in range(64):
@@ -336,9 +340,17 @@ class CHIP8Interpreter:
 
         if self.trace_mode:
             print(
-                "[%.4X:%s] %d %.4X"
-                % (code, func.__name__, self.program_counter, self.op_code)
+                "[%.4X:%s] %d %.4X | %.4X %.4X"
+                % (
+                    code,
+                    func.__name__,
+                    self.program_counter,
+                    self.op_code,
+                    self.vx,
+                    self.vy,
+                )
             )
+            self._debug_state()
 
         func()
 
@@ -439,7 +451,6 @@ class CHIP8Interpreter:
         """
         kk = self.op_code & 0x00FF  # extract the lower 8 bits
         self.gpio[self.vx] = kk
-        self.gpio[self.vx] &= 0xFF
 
     def _7xkk(self) -> None:
         """
@@ -479,8 +490,6 @@ class CHIP8Interpreter:
         bit in the result is also 1. Otherwise, it is 0.
         """
         self.gpio[self.vx] |= self.gpio[self.vy]
-        self.gpio[self.vx] &= 0xFF
-        self.VF = 0
 
     def _8xy2(self) -> None:
         """
@@ -492,8 +501,6 @@ class CHIP8Interpreter:
         bit in the result is also 1. Otherwise, it is 0.
         """
         self.gpio[self.vx] &= self.gpio[self.vy]
-        self.gpio[self.vx] &= 0xFF
-        self.VF = 0
 
     def _8xy3(self) -> None:
         """
@@ -505,8 +512,6 @@ class CHIP8Interpreter:
         both the same, then the corresponding bit in the result is set to 1. Otherwise, it is 0.
         """
         self.gpio[self.vx] ^= self.gpio[self.vy]
-        self.gpio[self.vx] &= 0xFF
-        self.VF = 0
 
     def _8xy4(self) -> None:
         """
@@ -533,7 +538,6 @@ class CHIP8Interpreter:
         sub = self.gpio[self.vx] - self.gpio[self.vy]
         self.VF = 1 if sub > 0 else 0
         self.gpio[self.vx] = sub
-        self.gpio[self.vx] &= 0xFF
 
     def _8xy6(self) -> None:
         """
@@ -546,6 +550,7 @@ class CHIP8Interpreter:
         self.VF = self.gpio[self.vx] & 0x1
         self.gpio[self.vx] >>= 1
         self.gpio[self.vx] &= 0xFF
+
         if self.trace_mode:
             print("[8xy6] %.4X" % (self.gpio[self.vx]))
 
@@ -557,8 +562,9 @@ class CHIP8Interpreter:
         If Vy > Vx, then VF is set to 1, otherwise 0. Then Vx is subtracted from Vy, and the results
         stored in Vx.
         """
-        self.VF = 1 if self.gpio[self.vy] > self.gpio[self.vx] else 0
-        self.gpio[self.vx] = self.gpio[self.vy] - self.gpio[self.vx]
+        sub = self.gpio[self.vy] - self.gpio[self.vx]
+        self.VF = 1 if sub > 0 else 0
+        self.gpio[self.vx] = sub
 
     def _8xyE(self) -> None:
         """
@@ -569,7 +575,7 @@ class CHIP8Interpreter:
         multiplied by 2.
         """
         # vx - 4 bit (15)
-        self.VF = 1 if self.gpio[self.vx] & 0b1000 else 0
+        self.VF = (self.gpio[self.vx] >> 7) & 0x1
         self.gpio[self.vx] <<= 1
         self.gpio[self.vx] &= 0xFF
 
@@ -600,7 +606,7 @@ class CHIP8Interpreter:
 
         The program counter is set to nnn plus the value of V0.
         """
-        self.program_counter = self.op_code & 0x0FFF + self.gpio[0]
+        self.program_counter = (self.op_code & 0x0FFF) + self.gpio[0]
 
     def _Cxkk(self) -> None:
         """
@@ -612,8 +618,7 @@ class CHIP8Interpreter:
         """
         random_byte = random.randint(0, 0xFF)
         kk = self.op_code & 0x00FF
-        self.gpio[self.vx] = random_byte & kk
-        self.gpio[self.vx] &= 0xFF
+        self.gpio[self.vx] = (random_byte & kk) & 0xFF
 
     def _Dxyn(self) -> None:
         """
@@ -630,7 +635,6 @@ class CHIP8Interpreter:
         y = self.gpio[self.vy] & 0xFF  # 0..31 pixels
         height = self.op_code & 0x000F
         length = 8
-        display_length = len(self.display)  # 2048
         self.VF = 0
         for col in range(height):
             pixel = self.memory[self.I + col]
@@ -638,7 +642,7 @@ class CHIP8Interpreter:
                 if not (pixel & (0x80 >> row)):
                     # bin(0x80) == 0x10000000
                     continue
-                idx = (((x + row) + (y + col) * 64)) % display_length
+                idx = (((x + row) + (y + col) * 64)) % self.display_length
                 if self.display[idx] == 1:
                     self.VF = 1
                 self.display[idx] ^= 1
@@ -698,7 +702,6 @@ class CHIP8Interpreter:
 
         for key in self.pressed_key:
             self.gpio[self.vx] = key
-            print("Fx0A >>>>")
 
     def _Fx15(self) -> None:
         """
@@ -725,7 +728,7 @@ class CHIP8Interpreter:
 
         The values of I and Vx are added, and the results are stored in I.
         """
-        self.VF = 1 if self.VF + self.gpio[self.vx] > 0xFFF else 0
+        self.VF = 1 if (self.VF + self.gpio[self.vx]) > 0xFFF else 0
         self.I += self.gpio[self.vx]
 
     def _Fx29(self) -> None:
@@ -737,7 +740,7 @@ class CHIP8Interpreter:
         of Vx. See section 2.4, Display, for more information on the Chip-8 hexadecimal font.
         """
         # each font sprite consists 5 hex numbers, starting from 0 in memory
-        self.I = self.gpio[self.vx] * 0x5
+        self.I = self.gpio[self.vx] * FONST_SIZE_IN_BYTES
 
     def _Fx33(self) -> None:
         """
@@ -748,9 +751,9 @@ class CHIP8Interpreter:
         location in I, the tens digit at location I+1, and the ones digit at location I+2.
         """
         vx = self.gpio[self.vx]
-        hundreds = (vx & 0b0100) >> 2
-        tens = (vx & 0b0010) >> 1
-        ones = vx & 1
+        hundreds = int((vx % 1000) / 100)
+        tens = int((vx % 100) / 10)
+        ones = vx % 10
         self.memory[self.I], self.memory[self.I + 1], self.memory[self.I + 2] = (
             hundreds,
             tens,
@@ -769,7 +772,7 @@ class CHIP8Interpreter:
         """
         for i in range(self.vx):
             self.memory[self.I + i] = self.gpio[i]
-        self.I = self.I + self.gpio[self.vx] + 1
+        self.I += self.vx + 1
 
     def _Fx65(self) -> None:
         """
@@ -780,7 +783,7 @@ class CHIP8Interpreter:
         """
         for i in range(self.vx):
             self.gpio[i] = self.memory[self.I + i]
-        self.I = self.I + self.gpio[self.vx] + 1
+        self.I += self.vx + 1
 
     def _unknown_op_code(self) -> None:
         """Not real op code"""
@@ -795,8 +798,27 @@ class CHIP8Interpreter:
         # TODO: play sound file, but how long?
         print("Sound!")
 
+    def _debug_state(self) -> None:
+        """Print current state of memory"""
+        print("-" * 45)
+        for i in range(4):
+            print(
+                "V%d: 0x%.2X\tV%d: 0x%.2X\tV%d: 0x%.2X\tV%d: 0x%.2X"
+                % (
+                    i,
+                    self.gpio[i],
+                    4 + i,
+                    self.gpio[4 + i],
+                    8 + i,
+                    self.gpio[8 + i],
+                    12 + i,
+                    self.gpio[12 + i],
+                )
+            )
+        print("-" * 45)
+
 
 if __name__ == "__main__":
     interpreter = CHIP8Interpreter()
-    interpreter.load_rom("rom/TETRIS.ch8")
+    interpreter.load_rom("roms/WALL.ch8")
     interpreter.run()
