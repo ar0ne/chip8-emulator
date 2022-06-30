@@ -195,12 +195,12 @@ class CHIP8Interpreter:
 
     @property
     def vx(self) -> int:
-        """extract vx from op code"""
+        """extract vx from op code (nibble=4bits)"""
         return (self.op_code & 0x0F00) >> 8
 
     @property
     def vy(self) -> int:
-        """Extract Vy from op code"""
+        """Extract Vy from op code (nibble=4bits)"""
         return (self.op_code & 0x00F0) >> 4
 
     def load_rom(self, path_to_rom: str) -> None:
@@ -339,18 +339,7 @@ class CHIP8Interpreter:
         func = self.OPS_MAPPING[code]
 
         if self.trace_mode:
-            print(
-                "[%.4X:%s] %d %.4X | %.4X %.4X"
-                % (
-                    code,
-                    func.__name__,
-                    self.program_counter,
-                    self.op_code,
-                    self.vx,
-                    self.vy,
-                )
-            )
-            self._debug_state()
+            self._debug_state(code, func.__name__)
 
         func()
 
@@ -798,12 +787,23 @@ class CHIP8Interpreter:
         # TODO: play sound file, but how long?
         print("Sound!")
 
-    def _debug_state(self) -> None:
+    def _debug_state(self, code, func) -> None:
         """Print current state of memory"""
+        print(
+            "[%.4X->%s] PC: %d | OP: %.4X | %d | %d"
+            % (
+                code,
+                func,
+                self.program_counter,
+                self.op_code,
+                self.vx,
+                self.vy,
+            )
+        )
         print("-" * 45)
         for i in range(4):
             print(
-                "V%d: 0x%.2X\tV%d: 0x%.2X\tV%d: 0x%.2X\tV%d: 0x%.2X"
+                "V%d: %d\tV%d: %d\tV%d: %d\tV%d: %d"
                 % (
                     i,
                     self.gpio[i],
@@ -820,5 +820,5 @@ class CHIP8Interpreter:
 
 if __name__ == "__main__":
     interpreter = CHIP8Interpreter()
-    interpreter.load_rom("roms/WALL.ch8")
+    interpreter.load_rom("roms/TETRIS.ch8")
     interpreter.run()
