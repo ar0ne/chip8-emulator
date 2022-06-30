@@ -105,10 +105,12 @@ class CHIP8Interpreter:
 
     VF = 0xF  # 15
     MEMORY_START = 0x200  # 512
+    MEMORY_SIZE = 4096
     # graphics consts
     GFX_BLOCK_SIZE = 10
     GFX_COLUMNS = 32
     GFX_ROWS = 64
+    GFX_FPS = 180
 
     def __init__(self) -> None:
         """Init emulator"""
@@ -123,9 +125,9 @@ class CHIP8Interpreter:
         self.stack = deque()
         # display monochrome with resolution 64x32 pixels
         self.display = [0] * self.GFX_ROWS * self.GFX_COLUMNS
-        self.DISPLAY_LENGTH = len(self.display)  # 2048
+        self.DISPLAY_SIZE = len(self.display)  # 2048
         # memory 4kb by 8 bits
-        self.memory = [0] * 4096
+        self.memory = [0] * self.MEMORY_SIZE
         # 8 bits registers (GPIO)
         self.gpio = [0] * 16
         # 16 bit (This register is generally used to store memory addresses, so only the
@@ -239,7 +241,7 @@ class CHIP8Interpreter:
                 if not self.sound_timer:
                     self.play_sound()
 
-            self.clock.tick(180)
+            self.clock.tick(self.GFX_FPS)
         pygame.quit()
 
     def draw(self) -> None:
@@ -644,7 +646,7 @@ class CHIP8Interpreter:
                         (x + row) % self.GFX_ROWS
                         + (y + col) % self.GFX_COLUMNS * self.GFX_ROWS
                     )
-                ) % self.DISPLAY_LENGTH
+                ) % self.DISPLAY_SIZE
                 if self.display[idx] == 1:
                     self.VF = 1
                 self.display[idx] ^= 1
