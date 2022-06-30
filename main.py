@@ -7,8 +7,8 @@ from collections import defaultdict, deque
 import pygame
 from pygame import constants as pygame_constants
 
+FONT_SIZE_IN_BYTES = 0x5
 # fmt: off
-FONST_SIZE_IN_BYTES = 0x5
 FONTS =  [
     0xF0, 0x90, 0x90, 0x90, 0xF0,  # 0
     0x20, 0x60, 0x20, 0x20, 0x70,  # 1
@@ -105,9 +105,13 @@ class CHIP8Interpreter:
 
     VF = 0xF  # 15
     MEMORY_START = 0x200  # 512
+    # graphics consts
+    GFX_BLOCK_SIZE = 10
+    GFX_COLUMNS = 32
+    GFX_ROWS = 64
 
     def __init__(self) -> None:
-        """Init VM"""
+        """Init emulator"""
 
         # This timer is intended to be used for timing the events of games.
         # Its value can be set and read.
@@ -118,7 +122,7 @@ class CHIP8Interpreter:
         # The stack is an array of 16 16-bit values for up to 12 levels of nesting
         self.stack = deque()
         # display monochrome with resolution 64x32 pixels
-        self.display = [0] * 64 * 32
+        self.display = [0] * self.GFX_ROWS * self.GFX_COLUMNS
         self.display_length = len(self.display)  # 2048
         # memory 4kb by 8 bits
         self.memory = [0] * 4096
@@ -135,16 +139,15 @@ class CHIP8Interpreter:
         self.stack_counter = 0
         self.working = False
         self.drawing = False
-
+        # set of pressed keyboard keys
         self.pressed_key = set()
-
+        # show debug logs if enabled
         self.trace_mode = True
         # fix FPS
         self.clock = pygame.time.Clock()
         # load fonts set into memory
         for i, font in enumerate(FONTS):
             self.memory[i] = font
-
         # define mapping op codes to handlers
         self.OPS_MAPPING = defaultdict(
             lambda: self._unknown_op_code,
@@ -188,7 +191,7 @@ class CHIP8Interpreter:
                 0xF065: self._Fx65,
             },
         )
-
+        # init screen and set caption
         pygame.init()
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("CHIP8 emulator")
@@ -248,11 +251,18 @@ class CHIP8Interpreter:
         # clear screen
         self.clear_screen()
         # draw current display
-        for col in range(32):
-            for row in range(64):
-                if self.display[row + col * 64]:
+        for row in range(self.GFX_ROWS):
+            for col in range(self.GFX_COLUMNS):
+                if self.display[row + col * self.GFX_ROWS]:
                     pygame.draw.rect(
-                        self.screen, WHITE, pygame.Rect(row * 10, col * 10, 10, 10)
+                        self.screen,
+                        WHITE,
+                        pygame.Rect(
+                            row * self.GFX_BLOCK_SIZE,
+                            col * self.GFX_BLOCK_SIZE,
+                            self.GFX_BLOCK_SIZE,
+                            self.GFX_BLOCK_SIZE,
+                        ),
                     )
         # update full display to the screen
         pygame.display.flip()
@@ -269,9 +279,6 @@ class CHIP8Interpreter:
 
         # process op code
         self._process_op_code()
-
-        if self.program_counter >= 4096:
-            self.working = False
 
     def read_keyboard(self) -> None:
         """Read from keyboard"""
@@ -359,7 +366,7 @@ class CHIP8Interpreter:
         00E0 - CLS
         Clear the display.
         """
-        self.display = [0] * 64 * 32
+        self.display = [0] * self.GFX_COLUMNS * self.GFX_ROWS
         self.drawing = True
 
     def _00EE(self) -> None:
@@ -629,12 +636,17 @@ class CHIP8Interpreter:
             pixel = self.memory[self.I + col]
             for row in range(length):
                 if not (pixel & (0x80 >> row)):
-                    # bin(0x80) == 0x10000000
+                    # bin(0x80) == 0b1000 0000
                     continue
                 idx = (((x + row) + (y + col) * 64)) % self.display_length
+                if 63 >= idx > 65:
+                    print("catch")
                 if self.display[idx] == 1:
                     self.VF = 1
-                self.display[idx] ^= 1
+                try:
+                    self.display[idx] ^= 1
+                except TypeError as exc:
+                    print("WHAT?")
 
         self.drawing = True
 
@@ -729,7 +741,7 @@ class CHIP8Interpreter:
         of Vx. See section 2.4, Display, for more information on the Chip-8 hexadecimal font.
         """
         # each font sprite consists 5 hex numbers, starting from 0 in memory
-        self.I = self.gpio[self.vx] * FONST_SIZE_IN_BYTES
+        self.I = self.gpio[self.vx] * FONT_SIZE_IN_BYTES
 
     def _Fx33(self) -> None:
         """
@@ -790,7 +802,7 @@ class CHIP8Interpreter:
     def _debug_state(self, code, func) -> None:
         """Print current state of memory"""
         print(
-            "[%.4X->%s] PC: %d | OP: %.4X | %d | %d"
+            "[%.4X->%s] PC: %d | OP: %.4X | X: %d | Y: %d | I: %.4X"
             % (
                 code,
                 func,
@@ -798,6 +810,7 @@ class CHIP8Interpreter:
                 self.op_code,
                 self.vx,
                 self.vy,
+                self.I,
             )
         )
         print("-" * 45)
@@ -816,9 +829,20 @@ class CHIP8Interpreter:
                 )
             )
         print("-" * 45)
+        self._debug_graphics()
+
+    def _debug_graphics(self) -> None:
+        """Print debug graphics"""
+        for col in range(self.GFX_COLUMNS):
+            for row in range(self.GFX_ROWS):
+                if self.display[row + col * self.GFX_ROWS]:
+                    print("x", end="")
+                else:
+                    print(" ", end="")
+            print("")
 
 
 if __name__ == "__main__":
     interpreter = CHIP8Interpreter()
-    interpreter.load_rom("roms/TETRIS.ch8")
+    interpreter.load_rom("roms/WALL.ch8")
     interpreter.run()
