@@ -123,7 +123,7 @@ class CHIP8Interpreter:
         self.stack = deque()
         # display monochrome with resolution 64x32 pixels
         self.display = [0] * self.GFX_ROWS * self.GFX_COLUMNS
-        self.display_length = len(self.display)  # 2048
+        self.DISPLAY_LENGTH = len(self.display)  # 2048
         # memory 4kb by 8 bits
         self.memory = [0] * 4096
         # 8 bits registers (GPIO)
@@ -638,15 +638,16 @@ class CHIP8Interpreter:
                 if not (pixel & (0x80 >> row)):
                     # bin(0x80) == 0b1000 0000
                     continue
-                idx = (((x + row) + (y + col) * 64)) % self.display_length
-                if 63 >= idx > 65:
-                    print("catch")
+                # we should limit index within row and column limits
+                idx = (
+                    (
+                        (x + row) % self.GFX_ROWS
+                        + (y + col) % self.GFX_COLUMNS * self.GFX_ROWS
+                    )
+                ) % self.DISPLAY_LENGTH
                 if self.display[idx] == 1:
                     self.VF = 1
-                try:
-                    self.display[idx] ^= 1
-                except TypeError as exc:
-                    print("WHAT?")
+                self.display[idx] ^= 1
 
         self.drawing = True
 
@@ -833,6 +834,8 @@ class CHIP8Interpreter:
 
     def _debug_graphics(self) -> None:
         """Print debug graphics"""
+        if not any(self.display):
+            return
         for col in range(self.GFX_COLUMNS):
             for row in range(self.GFX_ROWS):
                 if self.display[row + col * self.GFX_ROWS]:
