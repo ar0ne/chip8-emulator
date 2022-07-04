@@ -7,28 +7,6 @@ from collections import defaultdict, deque
 import pygame
 from pygame import constants as pygame_constants
 
-FONT_SIZE_IN_BYTES = 0x5
-# fmt: off
-FONTS =  [
-    0xF0, 0x90, 0x90, 0x90, 0xF0,  # 0
-    0x20, 0x60, 0x20, 0x20, 0x70,  # 1
-    0xF0, 0x10, 0xF0, 0x80, 0xF0,  # 2
-    0xF0, 0x10, 0xF0, 0x10, 0xF0,  # 3
-    0x90, 0x90, 0xF0, 0x10, 0x10,  # 4
-    0xF0, 0x80, 0xF0, 0x10, 0xF0,  # 5
-    0xF0, 0x80, 0xF0, 0x90, 0xF0,  # 6
-    0xF0, 0x10, 0x20, 0x40, 0x40,  # 7
-    0xF0, 0x90, 0xF0, 0x90, 0xF0,  # 8
-    0xF0, 0x90, 0xF0, 0x10, 0xF0,  # 9
-    0xF0, 0x90, 0xF0, 0x90, 0x90,  # A
-    0xE0, 0x90, 0xE0, 0x90, 0xE0,  # B
-    0xF0, 0x80, 0x80, 0x80, 0xF0,  # C
-    0xE0, 0x90, 0x90, 0x90, 0xE0,  # D
-    0xF0, 0x80, 0xF0, 0x80, 0xF0,  # E
-    0xF0, 0x80, 0xF0, 0x80, 0x80   # F
-]  # 16 x 5
-# fmt: on
-
 """
 16-key hexadecimal keypad with the following layout.
 
@@ -37,7 +15,7 @@ FONTS =  [
 7, 8, 9, E,
 A, 0, B, F,
 """
-KEYBOARD = {
+KEYBOARD_MAP = {
     pygame_constants.K_1: 0x1,
     pygame_constants.K_2: 0x2,
     pygame_constants.K_3: 0x3,
@@ -111,9 +89,42 @@ class CHIP8Interpreter:
     GFX_ROWS = 64
     GFX_FPS = 180
 
-    def __init__(self) -> None:
+    FONT_SIZE_IN_BYTES = 0x5
+    # fmt: off
+    FONTS = [
+        0xF0, 0x90, 0x90, 0x90, 0xF0,  # 0
+        0x20, 0x60, 0x20, 0x20, 0x70,  # 1
+        0xF0, 0x10, 0xF0, 0x80, 0xF0,  # 2
+        0xF0, 0x10, 0xF0, 0x10, 0xF0,  # 3
+        0x90, 0x90, 0xF0, 0x10, 0x10,  # 4
+        0xF0, 0x80, 0xF0, 0x10, 0xF0,  # 5
+        0xF0, 0x80, 0xF0, 0x90, 0xF0,  # 6
+        0xF0, 0x10, 0x20, 0x40, 0x40,  # 7
+        0xF0, 0x90, 0xF0, 0x90, 0xF0,  # 8
+        0xF0, 0x90, 0xF0, 0x10, 0xF0,  # 9
+        0xF0, 0x90, 0xF0, 0x90, 0x90,  # A
+        0xE0, 0x90, 0xE0, 0x90, 0xE0,  # B
+        0xF0, 0x80, 0x80, 0x80, 0xF0,  # C
+        0xE0, 0x90, 0x90, 0x90, 0xE0,  # D
+        0xF0, 0x80, 0xF0, 0x80, 0xF0,  # E
+        0xF0, 0x80, 0xF0, 0x80, 0x80  # F
+    ]  # 16 x 5
+    # fmt: on
+
+    def __init__(
+        self,
+        width: int = SCREEN_WIDTH,
+        height: int = SCREEN_HEIGHT,
+        block_size: int = GFX_BLOCK_SIZE,
+        keyboard_mapping: dict | None = None,
+        trace_mode: bool = False,
+    ) -> None:
         """Init emulator"""
 
+        self.width, self.height = width, height
+        self.block_size = block_size
+        self.rows = int(self.width / self.block_size)
+        self.columns = int(self.height / self.block_size)
         # This timer is intended to be used for timing the events of games.
         # Its value can be set and read.
         self.delay_timer = 0
@@ -123,7 +134,7 @@ class CHIP8Interpreter:
         # The stack is an array of 16 16-bit values for up to 12 levels of nesting
         self.stack = deque()
         # display monochrome with resolution 64x32 pixels
-        self.display = [0] * self.GFX_ROWS * self.GFX_COLUMNS
+        self.display = [0] * self.rows * self.columns
         self.DISPLAY_SIZE = len(self.display)  # 2048
         # memory 4kb by 8 bits
         self.memory = [0] * self.MEMORY_SIZE
@@ -143,11 +154,9 @@ class CHIP8Interpreter:
         # set of pressed keyboard keys
         self.pressed_key = set()
         # show debug logs if enabled
-        self.trace_mode = True
-        # fix FPS
-        self.clock = pygame.time.Clock()
+        self.trace_mode = trace_mode
         # load fonts set into memory
-        for i, font in enumerate(FONTS):
+        for i, font in enumerate(self.FONTS):
             self.memory[i] = font
         # define mapping op codes to handlers
         self.OPS_MAPPING = defaultdict(
@@ -192,9 +201,16 @@ class CHIP8Interpreter:
                 0xF065: self._Fx65,
             },
         )
+        if not keyboard_mapping:
+            self.keyboard = KEYBOARD_MAP
         # init screen and set caption
+        self.init_graphics()
+
+    def init_graphics(self) -> None:
+        """Init graphics"""
+        self.clock = pygame.time.Clock()
         pygame.init()
-        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.screen = pygame.display.set_mode((self.width, self.height))
         pygame.display.set_caption("CHIP8 emulator")
 
     @property
@@ -295,9 +311,9 @@ class CHIP8Interpreter:
         pygame.event.pump()
         pressed = pygame.key.get_pressed()
         self.pressed_key.clear()
-        for key in KEYBOARD.keys():
+        for key in self.keyboard.keys():
             if pressed[key]:
-                self.pressed_key.add(KEYBOARD[key])
+                self.pressed_key.add(self.keyboard[key])
         if pressed[pygame_constants.K_ESCAPE]:
             self.working = False
 
@@ -752,7 +768,7 @@ class CHIP8Interpreter:
         of Vx. See section 2.4, Display, for more information on the Chip-8 hexadecimal font.
         """
         # each font sprite consists 5 hex numbers, starting from 0 in memory
-        self.I = self.gpio[self.vx] * FONT_SIZE_IN_BYTES
+        self.I = self.gpio[self.vx] * self.FONT_SIZE_IN_BYTES
 
     def _Fx33(self) -> None:
         """
