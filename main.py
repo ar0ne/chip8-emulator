@@ -103,7 +103,6 @@ class CHIP8Interpreter:
         A beeping sound is played when the value of the sound timer is nonzero.
     """
 
-    VF = 0xF  # 15
     MEMORY_START = 0x200  # 512
     MEMORY_SIZE = 4096
     # graphics consts
@@ -207,6 +206,15 @@ class CHIP8Interpreter:
     def vy(self) -> int:
         """Extract Vy from op code (nibble=4bits)"""
         return (self.op_code & 0x00F0) >> 4
+
+    @property
+    def VF(self) -> int:
+        """Get VF"""
+        return self.gpio[0xF]
+
+    @VF.setter
+    def VF(self, val: int) -> None:
+        self.gpio[0xF] = val
 
     def load_rom(self, path_to_rom: str) -> None:
         """
