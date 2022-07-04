@@ -83,11 +83,6 @@ class CHIP8Interpreter:
 
     MEMORY_START = 0x200  # 512
     MEMORY_SIZE = 4096
-    # graphics consts
-    GFX_BLOCK_SIZE = 10
-    GFX_COLUMNS = 32
-    GFX_ROWS = 64
-    GFX_FPS = 180
 
     FONT_SIZE_IN_BYTES = 0x5
     # fmt: off
@@ -113,18 +108,24 @@ class CHIP8Interpreter:
 
     def __init__(
         self,
-        width: int = SCREEN_WIDTH,
-        height: int = SCREEN_HEIGHT,
-        block_size: int = GFX_BLOCK_SIZE,
+        width: int = 640,
+        height: int = 320,
+        screen_width: int = 640,
+        screen_height: int = 320,
+        block_size: int = 10,
         keyboard_mapping: dict | None = None,
         trace_mode: bool = False,
+        fps: int = 180,
     ) -> None:
         """Init emulator"""
 
-        self.width, self.height = width, height
-        self.block_size = block_size
-        self.rows = int(self.width / self.block_size)
-        self.columns = int(self.height / self.block_size)
+        self.WIDTH, self.HEIGHT = width, height
+        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = screen_width, screen_height
+        self.BLOCK_SIZE = block_size
+        self.ROWS = int(self.WIDTH / self.BLOCK_SIZE)
+        self.COLUMNS = int(self.HEIGHT / self.BLOCK_SIZE)
+        # frame per second
+        self.FPS = fps
         # This timer is intended to be used for timing the events of games.
         # Its value can be set and read.
         self.delay_timer = 0
@@ -134,7 +135,7 @@ class CHIP8Interpreter:
         # The stack is an array of 16 16-bit values for up to 12 levels of nesting
         self.stack = deque()
         # display monochrome with resolution 64x32 pixels
-        self.display = [0] * self.rows * self.columns
+        self.display = [0] * self.ROWS * self.COLUMNS
         self.DISPLAY_SIZE = len(self.display)  # 2048
         # memory 4kb by 8 bits
         self.memory = [0] * self.MEMORY_SIZE
@@ -210,7 +211,7 @@ class CHIP8Interpreter:
         """Init graphics"""
         self.clock = pygame.time.Clock()
         pygame.init()
-        self.screen = pygame.display.set_mode((self.width, self.height))
+        self.screen = pygame.display.set_mode((self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
         pygame.display.set_caption("CHIP8 emulator")
 
     @property
@@ -264,8 +265,15 @@ class CHIP8Interpreter:
                 self.sound_timer -= 1
                 if not self.sound_timer:
                     self.play_sound()
+            self.clock_tick()
+        self.stop()
 
-            self.clock.tick(self.GFX_FPS)
+    def clock_tick(self) -> None:
+        """Tick internal clock to stick to desired frame rate"""
+        self.clock.tick(self.FPS)
+
+    def stop(self) -> None:
+        """Stop running rom"""
         pygame.quit()
 
     def draw(self) -> None:
@@ -277,17 +285,17 @@ class CHIP8Interpreter:
         # clear screen
         self.clear_screen()
         # draw current display
-        for row in range(self.GFX_ROWS):
-            for col in range(self.GFX_COLUMNS):
-                if self.display[row + col * self.GFX_ROWS]:
+        for row in range(self.ROWS):
+            for col in range(self.COLUMNS):
+                if self.display[row + col * self.ROWS]:
                     pygame.draw.rect(
                         self.screen,
                         WHITE,
                         pygame.Rect(
-                            row * self.GFX_BLOCK_SIZE,
-                            col * self.GFX_BLOCK_SIZE,
-                            self.GFX_BLOCK_SIZE,
-                            self.GFX_BLOCK_SIZE,
+                            row * self.BLOCK_SIZE,
+                            col * self.BLOCK_SIZE,
+                            self.BLOCK_SIZE,
+                            self.BLOCK_SIZE,
                         ),
                     )
         # update full display to the screen
@@ -392,7 +400,7 @@ class CHIP8Interpreter:
         00E0 - CLS
         Clear the display.
         """
-        self.display = [0] * self.GFX_COLUMNS * self.GFX_ROWS
+        self.display = [0] * self.COLUMNS * self.ROWS
         self.drawing = True
 
     def _00EE(self) -> None:
@@ -666,10 +674,7 @@ class CHIP8Interpreter:
                     continue
                 # we should limit index within row and column limits
                 idx = (
-                    (
-                        (x + row) % self.GFX_ROWS
-                        + (y + col) % self.GFX_COLUMNS * self.GFX_ROWS
-                    )
+                    ((x + row) % self.ROWS + (y + col) % self.COLUMNS * self.ROWS)
                 ) % self.DISPLAY_SIZE
                 if self.display[idx] == 1:
                     self.VF = 1
@@ -862,9 +867,9 @@ class CHIP8Interpreter:
         """Print debug graphics"""
         if not any(self.display):
             return
-        for col in range(self.GFX_COLUMNS):
-            for row in range(self.GFX_ROWS):
-                if self.display[row + col * self.GFX_ROWS]:
+        for col in range(self.COLUMNS):
+            for row in range(self.ROWS):
+                if self.display[row + col * self.ROWS]:
                     print("x", end="")
                 else:
                     print(" ", end="")
