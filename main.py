@@ -1,49 +1,22 @@
 """
 CHIP-8 Interpreter.
 """
+import abc
+import os
 import random
+import sys
+import time
 from collections import defaultdict, deque
 
 import pygame
 from pygame import constants as pygame_constants
 
-"""
-16-key hexadecimal keypad with the following layout.
-
-1, 2, 3, C,
-4, 5, 6, D,
-7, 8, 9, E,
-A, 0, B, F,
-"""
-KEYBOARD_MAP = {
-    pygame_constants.K_1: 0x1,
-    pygame_constants.K_2: 0x2,
-    pygame_constants.K_3: 0x3,
-    pygame_constants.K_4: 0xC,
-    pygame_constants.K_q: 0x4,
-    pygame_constants.K_w: 0x5,
-    pygame_constants.K_e: 0x6,
-    pygame_constants.K_r: 0xD,
-    pygame_constants.K_a: 0x7,
-    pygame_constants.K_s: 0x8,
-    pygame_constants.K_d: 0x9,
-    pygame_constants.K_f: 0xE,
-    pygame_constants.K_z: 0xA,
-    pygame_constants.K_x: 0,
-    pygame_constants.K_c: 0xB,
-    pygame_constants.K_v: 0xF,
-}
-
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 
-SCREEN_WIDTH = 640
-SCREEN_HEIGHT = 320
 
-
-class CHIP8Interpreter:
-    """
-    Interpreter for CHIP-8
+class CHIP8Interpreter(abc.ABC):
+    """Interpreter for CHIP-8
 
                                     Memory
         Each memory location is 8 bits (byte) 4Kb - 0x000 (0) to 0xFFF (4095). First 512 bytes
@@ -83,6 +56,8 @@ class CHIP8Interpreter:
 
     MEMORY_START = 0x200  # 512
     MEMORY_SIZE = 4096
+    ROWS = 64
+    COLUMNS = 32
 
     FONT_SIZE_IN_BYTES = 0x5
     # fmt: off
@@ -104,28 +79,15 @@ class CHIP8Interpreter:
         0xF0, 0x80, 0xF0, 0x80, 0xF0,  # E
         0xF0, 0x80, 0xF0, 0x80, 0x80  # F
     ]  # 16 x 5
+
     # fmt: on
 
     def __init__(
         self,
-        width: int = 640,
-        height: int = 320,
-        screen_width: int = 640,
-        screen_height: int = 320,
-        block_size: int = 10,
-        keyboard_mapping: dict | None = None,
         trace_mode: bool = False,
-        fps: int = 180,
     ) -> None:
         """Init emulator"""
 
-        self.WIDTH, self.HEIGHT = width, height
-        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = screen_width, screen_height
-        self.BLOCK_SIZE = block_size
-        self.ROWS = int(self.WIDTH / self.BLOCK_SIZE)
-        self.COLUMNS = int(self.HEIGHT / self.BLOCK_SIZE)
-        # frame per second
-        self.FPS = fps
         # This timer is intended to be used for timing the events of games.
         # Its value can be set and read.
         self.delay_timer = 0
@@ -135,7 +97,7 @@ class CHIP8Interpreter:
         # The stack is an array of 16 16-bit values for up to 12 levels of nesting
         self.stack = deque()
         # display monochrome with resolution 64x32 pixels
-        self.display = [0] * self.ROWS * self.COLUMNS
+        self.display = [0] * 64 * 32
         self.DISPLAY_SIZE = len(self.display)  # 2048
         # memory 4kb by 8 bits
         self.memory = [0] * self.MEMORY_SIZE
@@ -161,7 +123,7 @@ class CHIP8Interpreter:
             self.memory[i] = font
         # define mapping op codes to handlers
         self.OPS_MAPPING = defaultdict(
-            lambda: self._unknown_op_code,
+            lambda: self.unknown_op_code,
             {
                 0x0000: self._0000,
                 0x00E0: self._00E0,
@@ -202,17 +164,6 @@ class CHIP8Interpreter:
                 0xF065: self._Fx65,
             },
         )
-        if not keyboard_mapping:
-            self.keyboard = KEYBOARD_MAP
-        # init screen and set caption
-        self.init_graphics()
-
-    def init_graphics(self) -> None:
-        """Init graphics"""
-        self.clock = pygame.time.Clock()
-        pygame.init()
-        self.screen = pygame.display.set_mode((self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
-        pygame.display.set_caption("CHIP8 emulator")
 
     @property
     def vx(self) -> int:
@@ -258,50 +209,33 @@ class CHIP8Interpreter:
             self.read_keyboard()
             self.process_op_code()
             self.draw()
-            # update timers
-            if self.delay_timer > 0:
-                self.delay_timer -= 1
-            if self.sound_timer > 0:
-                self.sound_timer -= 1
-                if not self.sound_timer:
-                    self.play_sound()
-            self.clock_tick()
+            self.update_timers()
         self.stop()
 
-    def clock_tick(self) -> None:
-        """Tick internal clock to stick to desired frame rate"""
-        self.clock.tick(self.FPS)
+    @abc.abstractmethod
+    def read_keyboard(self) -> None:
+        """Read from keyboard"""
+        pass
 
-    def stop(self) -> None:
-        """Stop running rom"""
-        pygame.quit()
+    @abc.abstractmethod
+    def play_sound(self) -> None:
+        """Play buzz sound"""
 
+    @abc.abstractmethod
     def draw(self) -> None:
         """Update display"""
 
-        if not self.drawing:
-            return
+    def update_timers(self) -> None:
+        """Update display and sound timers"""
+        if self.delay_timer > 0:
+            self.delay_timer -= 1
+        if self.sound_timer > 0:
+            self.sound_timer -= 1
+            if not self.sound_timer:
+                self.play_sound()
 
-        # clear screen
-        self.clear_screen()
-        # draw current display
-        for row in range(self.ROWS):
-            for col in range(self.COLUMNS):
-                if self.display[row + col * self.ROWS]:
-                    pygame.draw.rect(
-                        self.screen,
-                        WHITE,
-                        pygame.Rect(
-                            row * self.BLOCK_SIZE,
-                            col * self.BLOCK_SIZE,
-                            self.BLOCK_SIZE,
-                            self.BLOCK_SIZE,
-                        ),
-                    )
-        # update full display to the screen
-        pygame.display.flip()
-
-        self.drawing = False
+    def stop(self) -> None:
+        """Stop running"""
 
     def process_op_code(self) -> None:
         """Read op code and process it"""
@@ -313,17 +247,6 @@ class CHIP8Interpreter:
 
         # process op code
         self._process_op_code()
-
-    def read_keyboard(self) -> None:
-        """Read from keyboard"""
-        pygame.event.pump()
-        pressed = pygame.key.get_pressed()
-        self.pressed_key.clear()
-        for key in self.keyboard.keys():
-            if pressed[key]:
-                self.pressed_key.add(self.keyboard[key])
-        if pressed[pygame_constants.K_ESCAPE]:
-            self.working = False
 
     def _process_op_code(self) -> None:
         """
@@ -818,17 +741,40 @@ class CHIP8Interpreter:
             self.gpio[i] = self.memory[self.I + i]
         self.I += self.vx + 1
 
-    def _unknown_op_code(self) -> None:
+    def unknown_op_code(self) -> None:
         """Not real op code"""
         print("Unknown op code %s, %s", bin(self.op_code), hex(self.op_code))
 
-    def clear_screen(self) -> None:
-        """Clear screen"""
-        self.screen.fill(BLACK)
+
+class ConsoleCHIP8Interpreter(CHIP8Interpreter):
+    """
+    Console Interpreter for CHIP-8
+    """
+
+    def update_timers(self) -> None:
+        """Update display and sound timers, and stick to frame rate"""
+        super().update_timers()
+        time.sleep(0.003)
+
+    def read_keyboard(self) -> None:
+        """Read from keyboard"""
+        pass
+
+    def draw(self) -> None:
+        """Update display"""
+        if not any(self.display):
+            return
+        os.system("clear")
+        for col in range(self.COLUMNS):
+            for row in range(self.ROWS):
+                if self.display[row + col * self.ROWS]:
+                    print("x", end="")
+                else:
+                    print(" ", end="")
+            print("")
 
     def play_sound(self) -> None:
         """Play buzz sound"""
-        # TODO: play sound file, but how long?
         print("Sound!")
 
     def _debug_state(self, code, func) -> None:
@@ -861,22 +807,115 @@ class CHIP8Interpreter:
                 )
             )
         print("-" * 45)
-        self._debug_graphics()
 
-    def _debug_graphics(self) -> None:
-        """Print debug graphics"""
-        if not any(self.display):
+
+class PyGameCHIP8Interpreter(CHIP8Interpreter):
+    """PyGame CHIP-8 emulator"""
+
+    """
+    16-key hexadecimal keypad with the following layout.
+
+    1, 2, 3, C,
+    4, 5, 6, D,
+    7, 8, 9, E,
+    A, 0, B, F,
+    """
+    KEYBOARD_MAP = {
+        pygame_constants.K_1: 0x1,
+        pygame_constants.K_2: 0x2,
+        pygame_constants.K_3: 0x3,
+        pygame_constants.K_4: 0xC,
+        pygame_constants.K_q: 0x4,
+        pygame_constants.K_w: 0x5,
+        pygame_constants.K_e: 0x6,
+        pygame_constants.K_r: 0xD,
+        pygame_constants.K_a: 0x7,
+        pygame_constants.K_s: 0x8,
+        pygame_constants.K_d: 0x9,
+        pygame_constants.K_f: 0xE,
+        pygame_constants.K_z: 0xA,
+        pygame_constants.K_x: 0,
+        pygame_constants.K_c: 0xB,
+        pygame_constants.K_v: 0xF,
+    }
+
+    def __init__(
+        self,
+        screen_width: int = 640,
+        screen_height: int = 320,
+        block_size: int = 10,
+        trace_mode: bool = False,
+        keyboard_mapping: dict | None = None,
+    ) -> None:
+        super().__init__(trace_mode)
+        self.BLOCK_SIZE = block_size
+        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = screen_width, screen_height
+        assert block_size * self.ROWS <= screen_width, "Screen width is invalid."
+        assert block_size * self.COLUMNS <= screen_height, "Screen height is invalid."
+
+        # init pygame and screen
+        pygame.init()
+        self.screen = pygame.display.set_mode((self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
+        pygame.display.set_caption("CHIP8 emulator")
+        self.clock = pygame.time.Clock()
+
+        if not keyboard_mapping:
+            # if not present, use default mapping
+            keyboard_mapping = self.KEYBOARD_MAP
+        self.keyboard = keyboard_mapping
+
+    def update_timers(self) -> None:
+        """Update display and sound timers, and stick to required frame rate"""
+        super().update_timers()
+        self.clock.tick(180)
+
+    def stop(self) -> None:
+        """Stop running rom"""
+        pygame.quit()
+
+    def draw(self) -> None:
+        """Update display"""
+        if not self.drawing:
             return
-        for col in range(self.COLUMNS):
-            for row in range(self.ROWS):
+
+        # clear screen
+        self.screen.fill(BLACK)
+        # draw current display
+        for row in range(self.ROWS):
+            for col in range(self.COLUMNS):
                 if self.display[row + col * self.ROWS]:
-                    print("x", end="")
-                else:
-                    print(" ", end="")
-            print("")
+                    pygame.draw.rect(
+                        self.screen,
+                        WHITE,
+                        pygame.Rect(
+                            row * self.BLOCK_SIZE,
+                            col * self.BLOCK_SIZE,
+                            self.BLOCK_SIZE,
+                            self.BLOCK_SIZE,
+                        ),
+                    )
+        # update full display to the screen
+        pygame.display.flip()
+        # toggle drawing flag
+        self.drawing = False
+
+    def read_keyboard(self) -> None:
+        """Read from keyboard"""
+        pygame.event.pump()
+        pressed = pygame.key.get_pressed()
+        self.pressed_key.clear()
+        for key in self.keyboard.keys():
+            if pressed[key]:
+                self.pressed_key.add(self.keyboard[key])
+        if pressed[pygame_constants.K_ESCAPE]:
+            self.working = False
+
+    def play_sound(self) -> None:
+        """Play buzz sound"""
+        # TODO: play sound
 
 
 if __name__ == "__main__":
-    interpreter = CHIP8Interpreter()
-    interpreter.load_rom("roms/WALL.ch8")
+    interpreter = ConsoleCHIP8Interpreter()
+    interpreter.load_rom(sys.argv[1])
     interpreter.run()
