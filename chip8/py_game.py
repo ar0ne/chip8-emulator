@@ -1,7 +1,6 @@
 """
-CHIP-8 Interpreter.
+Run CHIP-8 Interpreter with PyGame.
 """
-import sys
 
 import pygame
 from pygame import constants as pygame_constants
@@ -117,9 +116,3 @@ class PyGameCHIP8Interpreter(CHIP8Interpreter):
     def play_sound(self) -> None:
         """Play buzz sound"""
         # TODO: play sound
-
-
-if __name__ == "__main__":
-    interpreter = PyGameCHIP8Interpreter()
-    interpreter.load_rom(sys.argv[1])
-    interpreter.run()

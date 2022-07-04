@@ -1,8 +1,7 @@
 """
-
+Run CHIP-8 emulator in terminal.
 """
 import os
-import sys
 import time
 
 from chip8.base import CHIP8Interpreter
@@ -20,7 +19,7 @@ class ConsoleCHIP8Interpreter(CHIP8Interpreter):
 
     def read_keyboard(self) -> None:
         """Read from keyboard"""
-        pass
+        # TODO: read from keyboard
 
     def draw(self) -> None:
         """Update display"""
@@ -38,9 +37,3 @@ class ConsoleCHIP8Interpreter(CHIP8Interpreter):
     def play_sound(self) -> None:
         """Play buzz sound"""
         print("Sound!")
-
-
-if __name__ == "__main__":
-    interpreter = ConsoleCHIP8Interpreter(trace_mode=True)
-    interpreter.load_rom(sys.argv[1])
-    interpreter.run()
