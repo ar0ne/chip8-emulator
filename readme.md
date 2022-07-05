@@ -2,6 +2,8 @@
 
 ## How to use
 
+You could run emulator in your terminal or use PyGame.
+
 ```
 usage: chip8.py [-h] [-t {console,pygame}] [-f FILE] [-d | --debug | --no-debug]
 
@@ -14,6 +16,8 @@ options:
   -f FILE, --file FILE  Path to ROM file.
   -d, --debug, --no-debug
 ```
+
+or `$ python menu.py`
 
 ## Info
 

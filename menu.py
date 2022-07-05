@@ -1,3 +1,7 @@
+#!/usr/bin/env python3
+"""
+Game UI for Chip8 emulator
+"""
 import pygame
 from pyghelpers import pyghelpers
 
