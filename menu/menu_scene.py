@@ -9,7 +9,7 @@ from pyghelpers import Scene
 
 from menu import font
 from menu.button import Button
-from menu.constants import BLACK, GAME_SCENE_KEY, MENU_SCENE_KEY, WHITE
+from menu.constants import BLACK, GAME_SCENE_KEY, MENU_SCENE_KEY, SELECTED_ROM, WHITE
 
 
 def check_file_extension(file, extension):
@@ -122,9 +122,8 @@ class MenuScene(Scene):
                     if self.selected_rom_index < 0:
                         self.selected_rom_index = self.current_page_size - 1
                 if event.key in (pygame.K_SPACE, pygame.K_RETURN):
-                    if not self.selected_rom_index % 10:
-                        # self.goToScene(GAME_SCENE_KEY)
-                        pass
+                    if self.selected_rom_index != self.current_page_size - 1:
+                        self.goToScene(GAME_SCENE_KEY)
                     else:
                         self.current_page += 1
                         self.selected_rom_index = (
@@ -135,6 +134,7 @@ class MenuScene(Scene):
                         last_page = (
                             self.current_page == len(self.roms) // self.page_size + 1
                         )
+
                         if last_page:
                             self.current_page = 0
 
@@ -154,3 +154,9 @@ class MenuScene(Scene):
             return len(self.roms) % (self.current_page * self.page_size) + 1
         else:
             return self.page_size + 1
+
+    def respond(self, requestID) -> str | None:
+        if requestID == SELECTED_ROM:
+            return self.roms[
+                self.selected_rom_index + self.current_page * self.page_size
+            ]

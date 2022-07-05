@@ -79,10 +79,6 @@ class PyGameCHIP8Interpreter(CHIP8Interpreter):
         super().update_timers()
         self.clock.tick(FPS)
 
-    def stop(self) -> None:
-        """Stop running rom"""
-        pygame.quit()
-
     def draw(self) -> None:
         """Update display"""
         if not self.drawing:

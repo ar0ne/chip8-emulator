@@ -213,7 +213,6 @@ class CHIP8Interpreter(abc.ABC):
             self.process_op_code()
             self.draw()
             self.update_timers()
-        self.stop()
 
     def update_timers(self) -> None:
         """Update display and sound timers"""
@@ -223,9 +222,6 @@ class CHIP8Interpreter(abc.ABC):
             self.sound_timer -= 1
             if not self.sound_timer:
                 self.play_sound()
-
-    def stop(self) -> None:
-        """Stop running"""
 
     def process_op_code(self) -> None:
         """Read op code and process it
