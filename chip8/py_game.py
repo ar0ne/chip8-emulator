@@ -50,6 +50,7 @@ class PyGameCHIP8Interpreter(CHIP8Interpreter):
         block_size: int = 10,
         trace_mode: bool = False,
         keyboard_mapping: dict | None = None,
+        sound_on: bool = True,
     ) -> None:
         super().__init__(trace_mode)
         self.BLOCK_SIZE = block_size
@@ -68,6 +69,8 @@ class PyGameCHIP8Interpreter(CHIP8Interpreter):
             self.screen = window
 
         self.clock = pygame.time.Clock()
+        self.beep = pygame.mixer.Sound(f"chip8/data/beep.wav")
+        self.sound_on = sound_on
 
         if not keyboard_mapping:
             # if not present, use default mapping
@@ -118,4 +121,5 @@ class PyGameCHIP8Interpreter(CHIP8Interpreter):
 
     def play_sound(self) -> None:
         """Play buzz sound"""
-        # TODO: play sound
+        if self.sound_on:
+            self.beep.play()

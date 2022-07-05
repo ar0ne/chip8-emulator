@@ -47,10 +47,9 @@ parser = create_parser()
 namespace = parser.parse_args(sys.argv[1:])
 
 if namespace.type == "console":
-    emulator_class = ConsoleCHIP8Interpreter
+    emulator = ConsoleCHIP8Interpreter(trace_mode=namespace.debug)
 else:
-    emulator_class = PyGameCHIP8Interpreter
+    emulator = PyGameCHIP8Interpreter(window=None, trace_mode=namespace.debug)
 
-emulator = emulator_class(trace_mode=namespace.debug)
 emulator.load_rom(namespace.file.name)
 emulator.run()
