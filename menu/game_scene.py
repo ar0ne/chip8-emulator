@@ -10,7 +10,7 @@ class GameScene(Scene):
 
     def __init__(self, window) -> None:
         """Init scene"""
-        self.emulator = PyGameCHIP8Interpreter()
+        self.emulator = PyGameCHIP8Interpreter(window=window)
 
     def getSceneKey(self) -> str:
         """Get scene key"""

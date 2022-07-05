@@ -9,7 +9,7 @@ from pyghelpers import Scene
 
 from menu import font
 from menu.button import Button
-from menu.constants import BLACK, MENU_SCENE_KEY, WHITE
+from menu.constants import BLACK, GAME_SCENE_KEY, MENU_SCENE_KEY, WHITE
 
 
 def check_file_extension(file, extension):
@@ -35,12 +35,7 @@ class MenuScene(Scene):
         self.current_page = 1
         self.rom_buttons = []
         self.selected_rom_index = 0
-        for rom_name in self.roms[
-            (self.current_page - 1)
-            * self.page_size : self.page_size
-            * self.current_page
-            - 1
-        ]:
+        for rom_name in self.roms:
             btn_image = self.font.render(rom_name[:-4])
             btn_image_scaled = pygame.transform.scale2x(btn_image)
             button = Button(
@@ -57,7 +52,6 @@ class MenuScene(Scene):
             (0, 0),
             lambda _, __: print("hello"),
         )
-        self.rom_buttons.append(self.next_page_button)
 
     def enter(self, data) -> None:
         """Enter scene"""
@@ -72,12 +66,25 @@ class MenuScene(Scene):
                 self.TOP_OFFSET,
             ),
         )
+        self.draw_game_select_buttons()
+
+    def draw_game_select_buttons(self) -> None:
+        """Draw game buttons"""
         x_offset = self.TOP_OFFSET
         y_offset = self.logo_img.get_height() * 2.5
+        second_column_x_offset = self.window.get_width() / 2
         btn_border_margin = 4
-        for idx, rom_btn in enumerate(self.rom_buttons):
-            if idx >= len(self.rom_buttons) / 2:
-                x_offset = self.window.get_width() / 2
+        btn_page = self.rom_buttons[
+            (self.current_page - 1)
+            * self.page_size : self.page_size
+            * self.current_page
+            - 1
+        ]
+        btn_page.append(self.next_page_button)
+
+        for idx, game_btn in enumerate(btn_page):
+            if idx >= 5:
+                x_offset = second_column_x_offset
             x = x_offset + 80
             y = y_offset + 40 * (idx % 5)
             if idx == self.selected_rom_index:
@@ -87,12 +94,12 @@ class MenuScene(Scene):
                     (
                         x - btn_border_margin,
                         y - btn_border_margin,
-                        rom_btn.image.get_width() + btn_border_margin,
-                        rom_btn.image.get_height() + btn_border_margin,
+                        game_btn.image.get_width() + btn_border_margin,
+                        game_btn.image.get_height() + btn_border_margin,
                     ),
                     1,
                 )
-            self.window.blit(rom_btn.image, (x, y))
+            self.window.blit(game_btn.image, (x, y))
 
     def getSceneKey(self) -> str:
         """Get unique scene key"""
@@ -111,7 +118,10 @@ class MenuScene(Scene):
                     if self.selected_rom_index < 0:
                         self.selected_rom_index = 9
                 if event.key in (pygame.K_SPACE, pygame.K_RETURN):
-                    pass
+                    if self.selected_rom_index != 9:
+                        self.goToScene(GAME_SCENE_KEY)
+                    else:
+                        pass
 
     def read_files_from_folder(self, folder, extension="ch8") -> list[str]:
         """Get all file names from folder with required format"""

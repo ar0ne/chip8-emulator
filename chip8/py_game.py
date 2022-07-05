@@ -44,6 +44,7 @@ class PyGameCHIP8Interpreter(CHIP8Interpreter):
 
     def __init__(
         self,
+        window: pygame.Surface | None,
         screen_width: int = 640,
         screen_height: int = 320,
         block_size: int = 10,
@@ -56,10 +57,16 @@ class PyGameCHIP8Interpreter(CHIP8Interpreter):
         assert block_size * self.ROWS <= screen_width, "Screen width is invalid."
         assert block_size * self.COLUMNS <= screen_height, "Screen height is invalid."
 
-        # init pygame and screen
-        pygame.init()
-        self.screen = pygame.display.set_mode((self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
-        pygame.display.set_caption("CHIP8 emulator")
+        if not window:
+            # init pygame and screen
+            pygame.init()
+            self.screen = pygame.display.set_mode(
+                (self.SCREEN_WIDTH, self.SCREEN_HEIGHT)
+            )
+            pygame.display.set_caption("CHIP8 emulator")
+        else:
+            self.screen = window
+
         self.clock = pygame.time.Clock()
 
         if not keyboard_mapping:
