@@ -100,8 +100,7 @@ class CHIP8Interpreter(abc.ABC):
         # executing address. Start from 0x200 (512), since beginning of memory reserved for
         # interpreter
         self.program_counter = self.MEMORY_START
-        # The stack pointer can be 8-bit, it is used to point to the topmost level of the stack
-        self.stack_counter = 0
+        # internal flags
         self.working = False
         self.drawing = False
         # set of pressed keyboard keys
@@ -206,7 +205,7 @@ class CHIP8Interpreter(abc.ABC):
                 byte = f.read(1)
 
     def run(self) -> None:
-        """Run program"""
+        """Run program loop"""
         self.working = True
         while self.working:
             self.read_keyboard()
@@ -288,6 +287,7 @@ class CHIP8Interpreter(abc.ABC):
 
         func()
 
+    ########################
     # OP code handlers
 
     def _0000(self) -> None:
@@ -487,9 +487,6 @@ class CHIP8Interpreter(abc.ABC):
         self.gpio[self.vx] >>= 1
         self.gpio[self.vx] &= 0xFF
 
-        if self.trace_mode:
-            print("[8xy6] %.4X" % (self.gpio[self.vx]))
-
     def _8xy7(self) -> None:
         """
         8xy7 - SUBN Vx, Vy
@@ -554,7 +551,7 @@ class CHIP8Interpreter(abc.ABC):
         """
         random_byte = random.randint(0, 0xFF)
         kk = self.op_code & 0x00FF
-        self.gpio[self.vx] = (random_byte & kk) & 0xFF
+        self.gpio[self.vx] = random_byte & kk
 
     def _Dxyn(self) -> None:
         """
