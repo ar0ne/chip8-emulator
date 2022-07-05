@@ -8,11 +8,11 @@ from pygame.surface import Surface
 from pyghelpers import Scene
 
 from menu import font
-from menu.button import Button
 from menu.constants import BLACK, GAME_SCENE_KEY, MENU_SCENE_KEY, SELECTED_ROM, WHITE
 
 
-def check_file_extension(file, extension):
+def check_file_extension(file: str, extension: str) -> bool:
+    """Check that file has correct extension"""
     args = os.path.splitext(file)
     if not (args and len(args) == 2):
         return False
@@ -22,14 +22,14 @@ def check_file_extension(file, extension):
 class MenuScene(Scene):
     """Menu scene"""
 
-    TOP_OFFSET = 30
-
     def __init__(self, window: Surface, data_dir: str, rom_dir: str) -> None:
         """Init scene"""
         self.window = window
+        self.WINDOW_WIDTH = window.get_width()
+        self.WINDOW_HEIGHT = window.get_height()
         self.logo_img = pygame.image.load(f"{data_dir}/logo.png")
-        self.font = font.RetroFont(f"{data_dir}/nes-font.png", (8, 8))
-        self.roms = self.read_files_from_folder(rom_dir)
+        self.font = font.Font(f"{data_dir}/nes-font.png", (8, 8))
+        self.roms = self.read_files_from_folder(rom_dir, "ch8")
         self.roms.sort()
         self.page_size = 9
         self.current_page = 0
@@ -41,63 +41,67 @@ class MenuScene(Scene):
         ]
         for rom_name in self.roms:
             btn_image = self.font.render(rom_name[:-4])
-            btn_image_scaled = pygame.transform.scale2x(btn_image)
-            button = Button(
-                btn_image_scaled,
-                (0, 0),
-                lambda _, __: print("hello"),
-            )
-            self.rom_buttons.append(button)
+            btn_image = pygame.transform.scale2x(btn_image)
+            self.rom_buttons.append(btn_image)
         # add button to display next page
         next_page_image = self.font.render("...")
-        next_page_image_scaled = pygame.transform.scale2x(next_page_image)
-        self.next_page_button = Button(
-            next_page_image_scaled,
-            (0, 0),
-            lambda _, __: print("hello"),
+        next_page_image = pygame.transform.scale2x(next_page_image)
+        self.next_page_button = next_page_image
+
+        self.TOP_OFFSET = 30
+        self.line_margin = 60
+        self.line1_y = self.TOP_OFFSET * 3 + self.logo_img.get_height()
+        self.line2_y = self.WINDOW_HEIGHT - 50
+        self.line_x = (self.line_margin, self.WINDOW_WIDTH - self.line_margin)
+        self.current_page_x = (
+            self.WINDOW_WIDTH / 2 - self.pages[self.current_page].get_width() / 2
         )
+        self.current_page_y = self.window.get_height() - 30
+        self.logo_img_x = self.WINDOW_WIDTH / 2 - self.logo_img.get_width() / 2
+        self.logo_img_y = self.TOP_OFFSET
+        self.button_x_offset = self.TOP_OFFSET
+        self.button_y_offset = self.logo_img.get_height() * 2.5
+        self.second_column_x_offset = self.WINDOW_WIDTH / 2 + 60
+        self.btn_border_margin = 4
 
     def draw(self) -> None:
         """Draw UI elements"""
         self.window.fill(BLACK)
+        # logo
         self.window.blit(
             self.logo_img,
             (
-                self.window.get_width() / 2 - self.logo_img.get_width() / 2,
-                self.TOP_OFFSET,
+                self.logo_img_x,
+                self.logo_img_y,
             ),
         )
-        line1_y = self.TOP_OFFSET * 3 + self.logo_img.get_height()
-        line2_y = self.window.get_height() - 50
-        line_margin = 60
+        # up line
         pygame.draw.line(
             self.window,
             WHITE,
-            (line_margin, line1_y),
-            (self.window.get_width() - line_margin, line1_y),
+            (self.line_x[0], self.line1_y),
+            (self.line_x[1], self.line1_y),
         )
+        # bottom line
         pygame.draw.line(
             self.window,
             WHITE,
-            (line_margin, line2_y),
-            (self.window.get_width() - line_margin, line2_y),
+            (self.line_x[0], self.line2_y),
+            (self.line_x[1], self.line2_y),
         )
+        # buttons and selected box
         self.draw_game_select_buttons()
+        # current page text
         self.window.blit(
             self.pages[self.current_page],
             (
-                self.window.get_width() / 2
-                - self.pages[self.current_page].get_width() / 2,
-                self.window.get_height() - 30,
+                self.current_page_x,
+                self.current_page_y,
             ),
         )
 
     def draw_game_select_buttons(self) -> None:
         """Draw game buttons"""
-        x_offset = self.TOP_OFFSET
-        y_offset = self.logo_img.get_height() * 2.5
-        second_column_x_offset = self.window.get_width() / 2
-        btn_border_margin = 4
         btn_page = self.rom_buttons[
             self.current_page
             * self.page_size : (self.current_page + 1)
@@ -106,23 +110,21 @@ class MenuScene(Scene):
         btn_page.append(self.next_page_button)
 
         for idx, game_btn in enumerate(btn_page):
-            if idx >= 5:
-                x_offset = second_column_x_offset
-            x = x_offset + 80
-            y = y_offset + 40 * (idx % 5)
+            x = self.button_x_offset + 80 if idx < 5 else self.second_column_x_offset
+            y = self.button_y_offset + 40 * (idx % 5)
             if idx == self.selected_rom_index:
                 pygame.draw.rect(
                     self.window,
                     WHITE,
                     (
-                        x - btn_border_margin,
-                        y - btn_border_margin,
-                        game_btn.image.get_width() + btn_border_margin,
-                        game_btn.image.get_height() + btn_border_margin,
+                        x - self.btn_border_margin,
+                        y - self.btn_border_margin,
+                        game_btn.get_width() + self.btn_border_margin,
+                        game_btn.get_height() + self.btn_border_margin,
                     ),
                     1,
                 )
-            self.window.blit(game_btn.image, (x, y))
+            self.window.blit(game_btn, (x, y))
 
     def getSceneKey(self) -> str:
         """Get unique scene key"""
@@ -146,14 +148,13 @@ class MenuScene(Scene):
                     else:
                         self.current_page += 1
                         self.selected_rom_index = 0
-
                         last_page = (
                             self.current_page == len(self.roms) // self.page_size + 1
                         )
                         if last_page:
                             self.current_page = 0
 
-    def read_files_from_folder(self, folder, extension="ch8") -> list[str]:
+    def read_files_from_folder(self, folder, extension) -> list[str]:
         """Get all file names from folder with required format"""
         return [
             f
@@ -171,6 +172,7 @@ class MenuScene(Scene):
             return self.page_size + 1
 
     def respond(self, requestID) -> str | None:
+        """Provide selected rom to game scene"""
         if requestID == SELECTED_ROM:
             return self.roms[
                 self.selected_rom_index + self.current_page * self.page_size

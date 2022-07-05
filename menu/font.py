@@ -4,22 +4,27 @@ from pygame.locals import *
 from menu.constants import BLACK, WHITE
 
 
-class RetroFont:
+class Font:
     """Custom font for retro games"""
 
-    def __init__(self, font_path: str, font_size: tuple[int, int]) -> None:
+    MAPPING = " abcdefghijklmnopqrstuvwxyz0123456789-+:,.=!)(?><"
 
+    def __init__(
+        self,
+        font_path: str,
+        font_size: tuple[int, int],
+        color: tuple[int, int, int] = WHITE,
+    ) -> None:
+        """Init font"""
+        self.font_size = font_size
+        self.color = color
         # Dict to hold the letter images
         self.letters = {}
-
         letters = {}
-        format = " abcdefghijklmnopqrstuvwxyz0123456789-+:,.=!)(?><"
-        self.font_size = font_size
-        self.color = WHITE
         strip = pygame.image.load(font_path).convert_alpha()
-        for i, x in enumerate(range(len(format))):
-            letters[format[i]] = pygame.Surface(self.font_size)
-            letters[format[i]].blit(strip, (-x * self.font_size[0], 0))
+        for i, x in enumerate(range(len(self.MAPPING))):
+            letters[self.MAPPING[i]] = pygame.Surface(self.font_size)
+            letters[self.MAPPING[i]].blit(strip, (-x * self.font_size[0], 0))
 
         # Create the letters
         for letter in letters:
