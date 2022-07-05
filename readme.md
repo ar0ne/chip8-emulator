@@ -19,6 +19,8 @@ options:
 
 or `$ python menu.py`
 
+![demo-video](demo.gif)
+
 ## Info
 
 https://en.wikipedia.org/wiki/CHIP-8
