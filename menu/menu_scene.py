@@ -28,7 +28,7 @@ class MenuScene(Scene):
         """Init scene"""
         self.window = window
         self.logo_img = pygame.image.load(f"{data_dir}/logo.png")
-        self.font = font.RetroFont("menu/data/nes-font.png", (8, 8))
+        self.font = font.RetroFont(f"{data_dir}/nes-font.png", (8, 8))
         self.roms = self.read_files_from_folder(rom_dir)
         self.roms.sort()
         self.page_size = 9
@@ -57,9 +57,6 @@ class MenuScene(Scene):
             lambda _, __: print("hello"),
         )
 
-    def enter(self, data) -> None:
-        """Enter scene"""
-
     def draw(self) -> None:
         """Draw UI elements"""
         self.window.fill(BLACK)
@@ -71,7 +68,14 @@ class MenuScene(Scene):
             ),
         )
         self.draw_game_select_buttons()
-        self.window.blit(self.pages[self.current_page], (10, 10))
+        self.window.blit(
+            self.pages[self.current_page],
+            (
+                self.window.get_width() / 2
+                - self.pages[self.current_page].get_width() / 2,
+                self.window.get_height() - 30,
+            ),
+        )
 
     def draw_game_select_buttons(self) -> None:
         """Draw game buttons"""
@@ -126,15 +130,11 @@ class MenuScene(Scene):
                         self.goToScene(GAME_SCENE_KEY)
                     else:
                         self.current_page += 1
-                        self.selected_rom_index = (
-                            self.selected_rom_index
-                            if self.current_page * (self.page_size + 1) < len(self.roms)
-                            else 0
-                        )
+                        self.selected_rom_index = 0
+
                         last_page = (
                             self.current_page == len(self.roms) // self.page_size + 1
                         )
-
                         if last_page:
                             self.current_page = 0
 

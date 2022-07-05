@@ -16,7 +16,7 @@ window = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("CHIP-8 Emulator")
 scenes = [
     MenuScene(window, data_dir=DATA_DIR, rom_dir=ROM_DIR),
-    GameScene(window, data_dir=DATA_DIR),
+    GameScene(window),
 ]
 scene_manager = pyghelpers.SceneMgr(scenes, FPS)
 scene_manager.run()
