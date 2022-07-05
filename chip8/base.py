@@ -68,7 +68,7 @@ class CHIP8Interpreter(abc.ABC):
         0xF0, 0x80, 0x80, 0x80, 0xF0,  # C
         0xE0, 0x90, 0x90, 0x90, 0xE0,  # D
         0xF0, 0x80, 0xF0, 0x80, 0xF0,  # E
-        0xF0, 0x80, 0xF0, 0x80, 0x80  # F
+        0xF0, 0x80, 0xF0, 0x80, 0x80   # F
     ]  # 16 x 5
     # fmt: on
 
@@ -155,6 +155,19 @@ class CHIP8Interpreter(abc.ABC):
             },
         )
 
+    @abc.abstractmethod
+    def read_keyboard(self) -> None:
+        """Read from keyboard"""
+        pass
+
+    @abc.abstractmethod
+    def play_sound(self) -> None:
+        """Play buzz sound"""
+
+    @abc.abstractmethod
+    def draw(self) -> None:
+        """Update display"""
+
     @property
     def vx(self) -> int:
         """extract vx from op code (nibble=4bits)"""
@@ -202,19 +215,6 @@ class CHIP8Interpreter(abc.ABC):
             self.update_timers()
         self.stop()
 
-    @abc.abstractmethod
-    def read_keyboard(self) -> None:
-        """Read from keyboard"""
-        pass
-
-    @abc.abstractmethod
-    def play_sound(self) -> None:
-        """Play buzz sound"""
-
-    @abc.abstractmethod
-    def draw(self) -> None:
-        """Update display"""
-
     def update_timers(self) -> None:
         """Update display and sound timers"""
         if self.delay_timer > 0:
@@ -228,19 +228,7 @@ class CHIP8Interpreter(abc.ABC):
         """Stop running"""
 
     def process_op_code(self) -> None:
-        """Read op code and process it"""
-        # op code consist 2 bytes (16 bits)
-        self.op_code = (self.memory[self.program_counter] << 8) | self.memory[
-            self.program_counter + 1
-        ]
-        self.program_counter += 2  # each instruction is 2 bytes
-
-        # process op code
-        self._process_op_code()
-
-    def _process_op_code(self) -> None:
-        """
-        Process operational code.
+        """Read op code and process it
 
         nnn or addr - A 12-bit value, the lowest 12 bits of the instruction
         n or nibble - A 4-bit value, the lowest 4 bits of the instruction
@@ -285,6 +273,13 @@ class CHIP8Interpreter(abc.ABC):
         Fx65 - LD Vx, [I]
         """
 
+        # op code consist 2 bytes (16 bits)
+        self.op_code = (self.memory[self.program_counter] << 8) | self.memory[
+            self.program_counter + 1
+        ]
+        self.program_counter += 2  # each instruction is 2 bytes
+
+        # run instruction
         code = self.op_code & 0xF000
         self._run_instruction(code)
 
@@ -293,9 +288,11 @@ class CHIP8Interpreter(abc.ABC):
         func = self.OPS_MAPPING[code]
 
         if self.trace_mode:
-            self.debug_current_state(code, func.__name__)
+            self._debug_current_state(code, func.__name__)
 
         func()
+
+    # OP code handlers
 
     def _0000(self) -> None:
         """
@@ -735,7 +732,7 @@ class CHIP8Interpreter(abc.ABC):
         """Not real op code"""
         print("Unknown op code %s, %s", bin(self.op_code), hex(self.op_code))
 
-    def debug_current_state(self, code, func) -> None:
+    def _debug_current_state(self, code, func) -> None:
         """Print current state of memory"""
         print(
             "[%.4X->%s] PC: %d | OP: %.4X | X: %d | Y: %d | I: %.4X"

@@ -32,13 +32,14 @@ def create_parser() -> argparse.ArgumentParser:
         help="Type of emulator. By default: pygame.",
     )
     parser.add_argument(
-        "-r",
-        "--rom",
+        "-f",
+        "--file",
         default="roms/WALL.ch8",
         type=lambda x: is_valid_file(parser, x),
         help="Path to ROM file.",
         metavar="FILE",
     )
+    parser.add_argument("-d", "--debug", action=argparse.BooleanOptionalAction)
     return parser
 
 
@@ -46,9 +47,10 @@ parser = create_parser()
 namespace = parser.parse_args(sys.argv[1:])
 
 if namespace.type == "console":
-    emulator = ConsoleCHIP8Interpreter()
+    emulator_class = ConsoleCHIP8Interpreter
 else:
-    emulator = PyGameCHIP8Interpreter()
+    emulator_class = PyGameCHIP8Interpreter
 
-emulator.load_rom(namespace.rom.name)
+emulator = emulator_class(trace_mode=namespace.debug)
+emulator.load_rom(namespace.file.name)
 emulator.run()
