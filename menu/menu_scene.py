@@ -133,26 +133,27 @@ class MenuScene(Scene):
     def handleInputs(self, events, keyPressedList) -> None:
         """Handle inputs"""
         for event in events:
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_DOWN:
-                    self.selected_rom_index += 1
-                    if self.selected_rom_index >= self.current_page_size:
-                        self.selected_rom_index = 0
-                if event.key == pygame.K_UP:
-                    self.selected_rom_index -= 1
-                    if self.selected_rom_index < 0:
-                        self.selected_rom_index = self.current_page_size - 1
-                if event.key in (pygame.K_SPACE, pygame.K_RETURN):
-                    if self.selected_rom_index != self.current_page_size - 1:
-                        self.goToScene(GAME_SCENE_KEY)
-                    else:
-                        self.current_page += 1
-                        self.selected_rom_index = 0
-                        last_page = (
-                            self.current_page == len(self.roms) // self.page_size + 1
-                        )
-                        if last_page:
-                            self.current_page = 0
+            if event.type != pygame.KEYDOWN:
+                return
+            if event.key == pygame.K_DOWN:
+                self.selected_rom_index += 1
+                if self.selected_rom_index > self.current_page_size:
+                    self.selected_rom_index = 0
+            if event.key == pygame.K_UP:
+                self.selected_rom_index -= 1
+                if self.selected_rom_index < 0:
+                    self.selected_rom_index = self.current_page_size
+            if event.key in (pygame.K_SPACE, pygame.K_RETURN):
+                if self.selected_rom_index != self.current_page_size:
+                    self.goToScene(GAME_SCENE_KEY)
+                else:
+                    self.current_page += 1
+                    self.selected_rom_index = 0
+                    last_page = (
+                        self.current_page == len(self.roms) // self.page_size + 1
+                    )
+                    if last_page:
+                        self.current_page = 0
 
     def read_files_from_folder(self, folder, extension) -> list[str]:
         """Get all file names from folder with required format"""
@@ -164,12 +165,12 @@ class MenuScene(Scene):
 
     @property
     def current_page_size(self) -> int:
-        """Count size of the current page (including next page button)"""
+        """Count size of the current page"""
         last_page = self.current_page == len(self.roms) // self.page_size
         if last_page:
-            return len(self.roms) % (self.current_page * self.page_size) + 1
+            return len(self.roms) % (self.current_page * self.page_size)
         else:
-            return self.page_size + 1
+            return self.page_size
 
     def respond(self, requestID) -> str | None:
         """Provide selected rom to game scene"""
