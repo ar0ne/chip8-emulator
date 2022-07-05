@@ -1,7 +1,7 @@
 import pygame
 from pygame.locals import *
 
-from menu.constants import WHITE
+from menu.constants import BLACK, WHITE
 
 
 class RetroFont:
@@ -14,15 +14,12 @@ class RetroFont:
 
         letters = {}
         format = " abcdefghijklmnopqrstuvwxyz0123456789-+:,.=!)(?><"
-        # = {"file": "nes-font.png", "size": (8, 8)}
         self.font_size = font_size
         self.color = WHITE
         strip = pygame.image.load(font_path).convert_alpha()
-        i = 0
-        for x in range(len(format)):
+        for i, x in enumerate(range(len(format))):
             letters[format[i]] = pygame.Surface(self.font_size)
             letters[format[i]].blit(strip, (-x * self.font_size[0], 0))
-            i += 1
 
         # Create the letters
         for letter in letters:
@@ -40,7 +37,7 @@ class RetroFont:
         """Render image for text"""
         text = text.lower()
         img = pygame.Surface((len(text) * self.font_size[0], self.font_size[1]))
-        img.set_colorkey((0, 0, 0), RLEACCEL)
+        img.set_colorkey(BLACK, RLEACCEL)
         pos = 0
         for char in text:
             if char in self.letters:

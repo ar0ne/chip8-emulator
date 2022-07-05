@@ -21,6 +21,16 @@ or `$ python menu.py`
 
 ![demo-video](demo.gif)
 
+## Keyboard Map
+```
++---+---+---+---+
+| 1 | 2 | 3 | 4 |
+| q | w | e | r |
+| a | s | d | f |
+| z | x | c | v |
++---+---+---+---+
+```
+
 ## Info
 
 https://en.wikipedia.org/wiki/CHIP-8
