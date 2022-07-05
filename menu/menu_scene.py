@@ -67,6 +67,21 @@ class MenuScene(Scene):
                 self.TOP_OFFSET,
             ),
         )
+        line1_y = self.TOP_OFFSET * 3 + self.logo_img.get_height()
+        line2_y = self.window.get_height() - 50
+        line_margin = 60
+        pygame.draw.line(
+            self.window,
+            WHITE,
+            (line_margin, line1_y),
+            (self.window.get_width() - line_margin, line1_y),
+        )
+        pygame.draw.line(
+            self.window,
+            WHITE,
+            (line_margin, line2_y),
+            (self.window.get_width() - line_margin, line2_y),
+        )
         self.draw_game_select_buttons()
         self.window.blit(
             self.pages[self.current_page],
