@@ -1,53 +1,57 @@
 import pygame
 from pygame.locals import *
 
-WHITE = (255, 255, 255)
+from menu.constants import WHITE
 
 
-class NesFont:
-    """Custom font"""
+class RetroFont:
+    """Custom font for retro games"""
 
-    def __init__(self):
+    def __init__(self, font_path: str, font_size: tuple[int, int]) -> None:
 
         # Dict to hold the letter images
         self.letters = {}
 
         letters = {}
         format = " abcdefghijklmnopqrstuvwxyz0123456789-+:,.=!)(?><"
-        self.font = {"file": "nes-font.png", "size": (8, 8)}
+        # = {"file": "nes-font.png", "size": (8, 8)}
+        self.font_size = font_size
         self.color = WHITE
-        strip = pygame.image.load("menu/nes-font.png").convert_alpha()
+        strip = pygame.image.load(font_path).convert_alpha()
         i = 0
         for x in range(len(format)):
-            letters[format[i]] = pygame.Surface(self.font["size"])
-            letters[format[i]].blit(strip, (-x * self.font["size"][0], 0))
+            letters[format[i]] = pygame.Surface(self.font_size)
+            letters[format[i]].blit(strip, (-x * self.font_size[0], 0))
             i += 1
 
         # Create the letters
         for letter in letters:
-            letterimg = letters[letter]
-            self.letters[letter] = pygame.Surface(self.font["size"])
+            letter_img = letters[letter]
+            self.letters[letter] = pygame.Surface(self.font_size)
             self.letters[letter].set_colorkey((0, 0, 0), RLEACCEL)
-            for y in range(letterimg.get_height()):
-                for x in range(letterimg.get_width()):
-                    if letterimg.get_at((x, y)) == (255, 255, 255, 255):
+            for y in range(letter_img.get_height()):
+                for x in range(letter_img.get_width()):
+                    if letter_img.get_at((x, y)) == (255, 255, 255, 255):
                         self.letters[letter].set_at((x, y), WHITE)
                     x += 1
                 y += 1
 
-    def render(self, text):
+    def render(self, text: str) -> pygame.Surface:
+        """Render image for text"""
         text = text.lower()
-        img = pygame.Surface((len(text) * self.font["size"][0], self.font["size"][1]))
+        img = pygame.Surface((len(text) * self.font_size[0], self.font_size[1]))
         img.set_colorkey((0, 0, 0), RLEACCEL)
         pos = 0
         for char in text:
             if char in self.letters:
                 img.blit(self.letters[char], (pos, 0))
-            pos += self.font["size"][0]
+            pos += self.font_size[0]
         return img
 
-    def get_width(self):
-        return self.font["size"][0]
+    def get_width(self) -> int:
+        """Get font width"""
+        return self.font_size[0]
 
-    def get_height(self):
-        return self.font["size"][1]
+    def get_height(self) -> int:
+        """Get font height"""
+        return self.font_size[1]
