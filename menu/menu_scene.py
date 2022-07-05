@@ -115,12 +115,12 @@ class MenuScene(Scene):
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_DOWN:
                     self.selected_rom_index += 1
-                    if self.selected_rom_index > self.page_size:
+                    if self.selected_rom_index >= self.current_page_size:
                         self.selected_rom_index = 0
                 if event.key == pygame.K_UP:
                     self.selected_rom_index -= 1
                     if self.selected_rom_index < 0:
-                        self.selected_rom_index = self.page_size
+                        self.selected_rom_index = self.current_page_size - 1
                 if event.key in (pygame.K_SPACE, pygame.K_RETURN):
                     if not self.selected_rom_index % 10:
                         # self.goToScene(GAME_SCENE_KEY)
@@ -145,3 +145,12 @@ class MenuScene(Scene):
             for f in listdir(folder)
             if isfile(join(folder, f)) and check_file_extension(f, extension)
         ]
+
+    @property
+    def current_page_size(self) -> int:
+        """Count size of the current page (including next page button)"""
+        last_page = self.current_page == len(self.roms) // self.page_size
+        if last_page:
+            return len(self.roms) % (self.current_page * self.page_size) + 1
+        else:
+            return self.page_size + 1
